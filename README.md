@@ -15,6 +15,12 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Update database
+
+```bash
+$ npm run db:update
+```
+
 ## Installation
 
 ```bash
