@@ -122,12 +122,14 @@ export class UserService {
 
   async resetPassword(email: string, newPassword: string) {
     try {
+      const password_hash = await this.hashPassword(newPassword);
+
       const user = await this.findOne({ email });
       if (!user) throw new BadRequestException('Invalid email');
 
       await this.knex<User>('users')
         .where({ email })
-        .update({ password_hash: newPassword, pin_hash: null });
+        .update({ password_hash, pin_hash: null });
 
       const updated = await this.findOne({ email });
       return {

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-// import { EmailService } from 'src/common/email.service';
+import { EmailService } from 'src/common/email.service';
 import { Knex } from 'knex';
 
 import { randomBytes } from 'crypto';
@@ -35,7 +35,7 @@ import { KNEX_CONNECTION } from 'src/database/knex.config';
 export class AuthService {
   constructor(
     private usersService: UserService,
-    // // private emailService: EmailService,
+    private emailService: EmailService,
     private redisService: RedisService,
     private errorFormat: ErrorFormat,
     readonly redis: RedisService,
@@ -106,7 +106,7 @@ export class AuthService {
         const key = `login-${OTP}`;
         await this.redisService.setTimedValue(key, user.email, 200); // store code against user ID
 
-        // await this.emailService.sendVerificationEmail(user.email, OTP);
+        await this.emailService.sendVerificationEmail(user.email, OTP);
 
         return {
           success: 'PENDING',
@@ -128,14 +128,10 @@ export class AuthService {
         expiresIn: Number(process.env.JWT_EXPIRES_IN) || '24h',
       });
 
-      const refreshToken = this.jwtService.sign(
-        // { userID: user.id, tv: user.tokenVersion },
-        tokenPayload,
-        {
-          secret: process.env.JWT_REFRESH_SECRET,
-          expiresIn: Number(process.env.JWT_REFRESH_EXPIRES_IN) || '30d',
-        },
-      );
+      const refreshToken = this.jwtService.sign(tokenPayload, {
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: Number(process.env.JWT_REFRESH_EXPIRES_IN) || '30d',
+      });
       await this.insertLoginHistory(
         user.id,
         'PASSWORD',

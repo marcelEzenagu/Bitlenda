@@ -10,21 +10,23 @@ export class EmailService {
     const mailgun = new Mailgun(formData);
     this.mailgunClient = mailgun.client({
       username: 'api',
-      key: process.env.MAILGUN_SECRET_KEY,
+      key: process.env.MAILGUN_KEY,
+      url: 'https://api.mailgun.net',
     });
   }
 
   async sendVerificationEmail(email: string, otp: string): Promise<void> {
     try {
       const domain = process.env.MAILGUN_DOMAIN;
+      const mailer = process.env.MAILGUN_FROM_EMAIL;
+
       return this.mailgunClient.messages.create(domain, {
-        from: `"Bitlenda App" <${process.env.MAILGUN_FROM_EMAIL}>`,
+        from: `Bitlenda <${mailer}>`,
         to: email,
         subject: 'Verify Your Email',
         html: `
           <html>
             <body>
-
               <h1>Bitlenda Email Verification</h1>
                 <p>
               Dear User,   
@@ -47,7 +49,7 @@ export class EmailService {
     try {
       const domain = process.env.MAILGUN_DOMAIN;
       return this.mailgunClient.messages.create(domain, {
-        from: `"Bitlenda App" <${process.env.MAILGUN_FROM_EMAIL}>`,
+        from: `"Bitlenda " <${process.env.MAILGUN_FROM_EMAIL}>`,
         to,
         subject,
         text,
