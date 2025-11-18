@@ -14,6 +14,8 @@ import { UserService } from 'src/user/user.service';
 import { AccessTokenMiddleware } from 'src/common/middleware/auth.middleware';
 import { ErrorFormat } from 'src/common/helpers/errorFormat';
 import { MongooseModule } from '@nestjs/mongoose';
+import { BiometricsController } from './biometrics.controller';
+import { BiometricsService } from './biometrics.service';
 
 @Module({
   imports: [
@@ -24,9 +26,10 @@ import { MongooseModule } from '@nestjs/mongoose';
     }),
     forwardRef(() => UserModule),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, BiometricsController],
   providers: [
     AuthService,
+    BiometricsService,
     ErrorFormat,
     EmailService,
     RedisService,

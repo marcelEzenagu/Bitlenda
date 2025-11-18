@@ -123,7 +123,10 @@ export interface User {
   first_name: string;
   last_name: string;
   email: string;
+  bvn: string;
+  dob: string;
   password_hash: string;
+  pin_hash: string;
   is_email_verified?: boolean;
   is_phone_verified?: boolean;
   is_verified?: boolean;

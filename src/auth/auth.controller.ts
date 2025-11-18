@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Request, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Request,
+  Patch,
+  Req,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
   CreateAccountDto,
@@ -16,11 +24,16 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { VerifyLogin } from './dto/update-auth.dto';
+import { SetPinDto } from 'src/user/dto/update-user.dto';
+import { UserService } from 'src/user/user.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+  ) {}
 
   @Get('logout')
   @ApiOperation({ summary: 'User logout' })
@@ -34,6 +47,26 @@ export class AuthController {
     const userID = req.claims['sub'];
 
     return await this.authService.logout(userID, isAdmin);
+  }
+
+  // send-resendOTP
+  @Post('set-pin')
+  @ApiOperation({ summary: 'user sets transaction pin' })
+  @ApiBody({ type: SetPinDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Pin set successfully',
+    schema: {
+      example: {
+        success: 'OK',
+        message: 'Pin set successful',
+      },
+    },
+  })
+  async setPin(@Body() dto: SetPinDto, @Request() req) {
+    const { userID, email } = req.claims;
+
+    return await this.userService.setPin(userID, email, dto);
   }
 
   @Post('register-user')
@@ -99,34 +132,25 @@ export class AuthController {
     return await this.authService.resendOTP(dto);
   }
 
-  // @Post('login')
-  // @ApiOperation({ summary: 'logs in a user using email' })
-  // @ApiResponse({
-  //   schema: {
-  //     example: {
-  //       access_token: 'user-access-token',
-  //       user: {
-  //         fullName: 'john brow',
-  //         role: 'USER',
-  //         email: 'marcelagu92@gmail.com',
-  //         isEmailVerified: true,
-  //         status: 'active',
-  //         deletedAt: null,
-  //         lastActive: null,
-  //         tokenVersion: 3,
-  //         createdAt: '2025-10-22T03:29:49.592Z',
-  //         updatedAt: '2025-10-22T16:45:50.754Z',
-  //         __v: 0,
-  //       },
-  //       success: 'OK',
-  //     },
-  //   },
-  // })
-  // async login(@Body() body: CreateAuthDto) {
-  //   const user = await this.authService.validateUser(body.email, body.password);
+  @Post('login')
+  @ApiOperation({ summary: 'logs in a user using email' })
+  @ApiResponse({
+    schema: {
+      example: {
+        access_token: 'user-access-token',
+        refreshToken: '',
+        user: {},
+        success: 'OK',
+      },
+    },
+  })
+  async login(@Body() body: CreateAuthDto, @Req() req) {
+    const ip = req.ip || (req.headers && req.headers['x-forwarded-for']);
+    const userAgent = req.headers['user-agent'] || '';
+    const user = await this.authService.validateUser(body.email, body.password);
 
-  //   return await this.authService.login(user);
-  // }
+    return await this.authService.login(user, ip, userAgent);
+  }
 
   // @Post('verify-login')
   // @ApiOperation({ summary: 'Verify OTP for admin login' })
@@ -171,10 +195,9 @@ export class AuthController {
     status: 200,
     schema: {
       example: {
+        next: 'set-pin',
         success: 'OK',
-        message: '',
-        user: {},
-        access_token: "user's accessToken",
+        message: 'Password reset successful',
       },
     },
   })

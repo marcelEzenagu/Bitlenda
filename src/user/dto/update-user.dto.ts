@@ -7,6 +7,8 @@ import {
   IsString,
   Length,
   Matches,
+  IsEnum,
+  IsOptional,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -20,8 +22,70 @@ export class SetPinDto {
   @Matches(/^\d{4}$/, { message: 'PIN must contain only digits' })
   pin: string;
 }
-export class BiometricDto {
-  @ApiProperty({ example: true })
-  @IsBoolean()
-  enabled: boolean;
+
+export enum VerificationSection {
+  PERSONAL_INFO = 'PERSONAL_INFO',
+  COUNTRY_RESIDENCE = 'COUNTRY_RESIDENCE',
+  CONTACT_INFO = 'CONTACT_INFO',
+  REGULATORY_INFO = 'REGULATORY_INFO',
+  COMPLETED = 'COMPLETED',
+}
+
+export class VerificationDto {
+  @ApiProperty({
+    required: false,
+    description: 'User first name, used in PERSONAL_INFO step',
+  })
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'User last name, used in PERSONAL_INFO step',
+  })
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Date of birth (YYYY-MM-DD), used in PERSONAL_INFO step',
+  })
+  @IsOptional()
+  @IsString()
+  dob?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'User country of residence, used in COUNTRY_RESIDENCE step',
+  })
+  @IsOptional()
+  @IsString()
+  countryOfResidence?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Phone number, used in CONTACT_INFO step',
+  })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'BVN number, used in REGULATORY_INFO step',
+  })
+  @IsOptional()
+  @IsString()
+  bvn?: string;
+
+  @ApiProperty({
+    enum: VerificationSection,
+    description:
+      'Indicates which section the user is currently submitting data for',
+    example: VerificationSection.PERSONAL_INFO,
+  })
+  @IsEnum(VerificationSection)
+  section: VerificationSection;
 }

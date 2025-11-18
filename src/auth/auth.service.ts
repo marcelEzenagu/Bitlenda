@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -8,7 +9,9 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { EmailService } from 'src/common/email.service';
+// import { EmailService } from 'src/common/email.service';
+import { Knex } from 'knex';
+
 import { randomBytes } from 'crypto';
 import { RedisService } from 'src/common/redis.service';
 import {
@@ -26,16 +29,19 @@ import { Types } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserService } from 'src/user/user.service';
+import { KNEX_CONNECTION } from 'src/database/knex.config';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UserService,
-    private jwtService: JwtService,
-    private emailService: EmailService,
+    // // private emailService: EmailService,
     private redisService: RedisService,
     private errorFormat: ErrorFormat,
+    readonly redis: RedisService,
+    readonly jwtService: JwtService,
 
+    @Inject(KNEX_CONNECTION) readonly knex: Knex,
     // private notificationService: NotificationService,
   ) {}
   async validateUser(email: string, password: string) {
@@ -59,6 +65,7 @@ export class AuthService {
       user.token_version += 1;
       // await user.save();
       user.password_hash = undefined;
+      user.bvn = undefined;
 
       return user;
     } catch (e) {
@@ -91,22 +98,15 @@ export class AuthService {
       throw new BadRequestException(this.errorFormat.formatErrors(e));
     }
   }
-  async login(user: User) {
+  async login(user: User, ip: string, userAgent: string) {
     try {
-      const payload = {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        version: user.token_version,
-      };
-
       if (user.role == RoleName.ADMIN || user.role == RoleName.SUPER_ADMIN) {
         const OTP = this.generateOtp();
 
         const key = `login-${OTP}`;
         await this.redisService.setTimedValue(key, user.email, 200); // store code against user ID
 
-        await this.emailService.sendVerificationEmail(user.email, OTP);
+        // await this.emailService.sendVerificationEmail(user.email, OTP);
 
         return {
           success: 'PENDING',
@@ -115,14 +115,44 @@ export class AuthService {
         };
       }
 
-      const access_token = await this.generateToken(payload);
+      const tokenPayload = {
+        userID: user.id,
+        email: user.email,
+        role: user.role,
+        isVerified: user.is_verified,
+        version: user.token_version,
+      };
+      // generate tokens
+      const accessToken = this.jwtService.sign(tokenPayload, {
+        secret: process.env.JWT_SECRET,
+        expiresIn: Number(process.env.JWT_EXPIRES_IN) || '24h',
+      });
+
+      const refreshToken = this.jwtService.sign(
+        // { userID: user.id, tv: user.tokenVersion },
+        tokenPayload,
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+          expiresIn: Number(process.env.JWT_REFRESH_EXPIRES_IN) || '30d',
+        },
+      );
+      await this.insertLoginHistory(
+        user.id,
+        'PASSWORD',
+        '',
+        ip,
+        userAgent,
+        true,
+      );
       return {
-        access_token,
+        accessToken,
+        refreshToken,
         user,
         success: 'OK',
       };
     } catch (e) {
       console.log('ERR:: ', e);
+      throw e;
     }
   }
 
@@ -268,7 +298,7 @@ export class AuthService {
       const otpType =
         dto.otpType == 'verification'
           ? 'verification'
-          : dto.otpType == 'reset'
+          : dto.otpType == 'reset-password'
             ? 'reset-password'
             : 'invalid';
 
@@ -291,8 +321,7 @@ export class AuthService {
       return {
         success: 'OK',
         OTP,
-        next: `verify-email`,
-
+        next: otpType != 'reset-password' ? `verify-email` : undefined,
         message: 'OTP sent successful',
       };
     } catch (error) {
@@ -348,7 +377,7 @@ export class AuthService {
     const value = `${OTP}-${role}`;
     await this.generateTemporaryAccessCode(verificationType, value, dto.email);
 
-    //   await this.emailService.sendVerificationEmail(user.email, OTP);
+    // await this.emailService.sendVerificationEmail(user.email, OTP);
 
     return {
       success: true,
@@ -573,6 +602,7 @@ export class AuthService {
       return {
         success: 'OK',
         message,
+        next: 'set-pin',
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -580,5 +610,88 @@ export class AuthService {
       }
       throw error;
     }
+  }
+
+  // async loginByEmail(
+  //   email: string,
+  //   password: string,
+  //   ip?: string,
+  //   userAgent?: string,
+  // ) {
+  //   const user = await this.knex('users').where({ email }).first();
+  //   if (!user) throw new UnauthorizedException('Invalid credentials');
+
+  //   const pwOk = await bcrypt.compare(password, user.password_hash);
+  //   if (!pwOk) {
+  //     await this.recordLogin(user.id, 'PASSWORD', null, ip, userAgent, false);
+  //     throw new UnauthorizedException('Invalid credentials');
+  //   }
+
+  //   // optional account status checks
+  //   if (user.status && user.status !== 'ACTIVE') {
+  //     throw new UnauthorizedException('Account not active');
+  //   }
+
+  //   const accessToken = this.jwtService.sign(
+  //     { sub: user.id, email: user.email },
+  //     {
+  //       secret: process.env.JWT_SECRET,
+  //       expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+  //     },
+  //   );
+  //   const refreshToken = this.jwtService.sign(
+  //     { sub: user.id, tv: user.tokenVersion },
+  //     {
+  //       secret: process.env.JWT_REFRESH_SECRET,
+  //       expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+  //     },
+  //   );
+
+  //   await this.recordLogin(user.id, 'PASSWORD', null, ip, userAgent, true);
+
+  //   return {
+  //     accessToken,
+  //     refreshToken,
+  //     user,
+  //     biometrics_enabled: !!user.has_biometrics,
+  //   };
+  // }
+
+  private async recordLogin(
+    userId: number,
+    method: 'PASSWORD' | 'BIOMETRICS',
+    deviceId?: string,
+    ip?: string,
+    userAgent?: string,
+    success = true,
+  ) {
+    await this.knex('user_login_history').insert({
+      user_id: userId,
+      login_method: method,
+      device_id: deviceId ?? null,
+      ip_address: ip ?? null,
+      user_agent: userAgent ?? null,
+      success,
+      created_at: this.knex.fn.now(),
+    });
+  }
+
+  async insertLoginHistory(
+    userId: string,
+    method: 'PASSWORD' | 'BIOMETRICS',
+    deviceId?: string,
+    ip?: string,
+    userAgent?: string,
+    success = true,
+  ) {
+    await this.knex('user_login_history').insert({
+      user_id: userId,
+      login_method: method,
+      device_id: deviceId ?? null,
+      ip_address: ip ?? null,
+      user_agent: userAgent ?? null,
+      success,
+      created_at: this.knex.fn.now(),
+    });
   }
 }
