@@ -20,6 +20,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:update": "knex migrate:latest",
+    "vercel-build": "nest build && cp -r src/database/cert dist/database/",
     "down": "knex migrate:rollback",
     "db:create": "ts-node src/database/create-database.ts",
     "db:migrate": "ts-node src/database/run-migrations.ts"
