@@ -30,7 +30,17 @@ async function createApp() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      // Use official Swagger CDN
+      swaggerUiBundleUrl:
+        'https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui-bundle.js',
+      swaggerUiStandalonePresetUrl:
+        'https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui-standalone-preset.js',
+      swaggerUiCssUrl:
+        'https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui.css',
+    },
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -59,7 +69,7 @@ if (process.env.VERCEL !== 'true') {
 export default async function handler(req: Request, res: Response) {
   if (!server) {
     const app = await createApp();
-    // 👇 this returns the Express instance that can handle (req,res)
+    //  this returns the Express instance that can handle (req,res)
     server = app.getHttpAdapter().getInstance();
   }
 
