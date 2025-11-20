@@ -2,10 +2,33 @@
   Bitlenda
 </h3>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# Bitlenda
 
-  <p align="center">A fintech application with crypto inclusion</p>
+Bitlenda is an early-stage software project focused on building a scalable,
+modular system architecture. This repository currently contains the initial
+project structure and development roadmap, which will evolve as the project
+advances.
+
+## Current Status
+
+- Project initialization
+- Base folder structure
+- Early specification and planning
+
+## Roadmap
+
+- Define core modules
+- Implement service structure
+- Add API endpoints
+- Integrate persistence layer
+- Add tests and documentation
+
+## Citation
+
+If you use this project or reference its structure, please cite the DOI
+generated through Zenodo (coming after first release).
+
+ <p align="center">A fintech application with crypto inclusion</p>
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 

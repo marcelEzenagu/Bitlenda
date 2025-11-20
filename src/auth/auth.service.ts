@@ -84,13 +84,13 @@ export class AuthService {
 
       const { OTP } = await this.getTokenAndOTP(user.email, createUserDto.role);
 
-      // await this.emailService.sendVerificationEmail(user.email, OTP);
+      await this.emailService.sendVerificationEmail(user.email, OTP);
 
       return {
         success: 'OK',
         message: 'Registered successfully',
         next: 'verify-email',
-        OTP,
+        // OTP,
       };
     } catch (e) {
       console.log('ERROR:  ', e);
@@ -110,7 +110,7 @@ export class AuthService {
 
         return {
           success: 'PENDING',
-          OTP,
+          // OTP,
           message: `Verification code sent to ${user.email}. Please verify to login.`,
         };
       }
@@ -312,11 +312,11 @@ export class AuthService {
         dto.email,
       );
 
-      // await this.emailService.sendVerificationEmail(user.email, OTP);
+      await this.emailService.sendVerificationEmail(user.email, OTP);
 
       return {
         success: 'OK',
-        OTP,
+        // OTP,
         next: otpType != 'reset-password' ? `verify-email` : undefined,
         message: 'OTP sent successful',
       };
@@ -373,11 +373,11 @@ export class AuthService {
     const value = `${OTP}-${role}`;
     await this.generateTemporaryAccessCode(verificationType, value, dto.email);
 
-    // await this.emailService.sendVerificationEmail(user.email, OTP);
+    await this.emailService.sendVerificationEmail(user.email, OTP);
 
     return {
       success: true,
-      OTP,
+      // OTP,
       next: `verify-${emailType}`,
       message: `OTP sent successfully to ${dto.email}`,
     };
@@ -512,12 +512,12 @@ export class AuthService {
         dto.email,
       );
 
-      // await this.emailService.sendVerificationEmail(user.email, OTP);
+      await this.emailService.sendVerificationEmail(user.email, OTP);
 
       return {
         message: 'A Password Reset OTP sent',
         success: 'OK',
-        OTP,
+        // OTP,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {

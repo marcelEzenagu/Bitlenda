@@ -16,6 +16,7 @@ import { AllExceptionsFilter } from './common/helpers/exception';
 
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+// import { createDatabaseIfNotExists } from './database/admin.config';
 
 async function bootstrap() {
   try {

@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "prebuild": "rimraf dist",
-    "build": "nest build",
+    "build": "nest build && cp -r src/database/cert dist/database/",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -20,7 +20,9 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:update": "knex migrate:latest",
-    "down": "knex migrate:rollback"
+    "down": "knex migrate:rollback",
+    "db:create": "ts-node src/database/create-database.ts",
+    "db:migrate": "ts-node src/database/run-migrations.ts"
   },
   "dependencies": {
     "@getbrevo/brevo": "^3.0.1",
@@ -44,6 +46,7 @@
     "multer": "^2.0.2",
     "multer-s3": "^3.0.1",
     "mysql2": "^3.15.3",
+    "pg": "^8.16.3",
     "redis": "^5.8.3",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"
