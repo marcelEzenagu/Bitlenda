@@ -62,8 +62,6 @@ export class AuthService {
       const isMatch = await bcrypt.compare(password, user.password_hash);
       if (!isMatch) throw new UnauthorizedException('Incorrect password');
 
-      user.token_version += 1;
-      // await user.save();
       user.password_hash = undefined;
       user.bvn = undefined;
 
@@ -98,6 +96,7 @@ export class AuthService {
       throw new BadRequestException(this.errorFormat.formatErrors(e));
     }
   }
+
   async login(user: User, ip: string, userAgent: string) {
     try {
       if (user.role == RoleName.ADMIN || user.role == RoleName.SUPER_ADMIN) {
@@ -110,7 +109,6 @@ export class AuthService {
 
         return {
           success: 'PENDING',
-          // OTP,
           message: `Verification code sent to ${user.email}. Please verify to login.`,
         };
       }
@@ -118,9 +116,9 @@ export class AuthService {
       const tokenPayload = {
         userID: user.id,
         email: user.email,
-        role: user.role,
+        role: RoleName.USER,
         isVerified: user.is_verified,
-        version: user.token_version,
+        version: (user.token_version += 1),
       };
       // generate tokens
       const accessToken = this.jwtService.sign(tokenPayload, {
@@ -439,12 +437,10 @@ export class AuthService {
       const decoded = await this.jwtService.verifyAsync(token);
 
       if (decoded.role === RoleName.USER) {
-        // const role = decoded['role'].split('-')[0];
-        const user = await this.usersService.findById(decoded.sub);
+        const user = await this.usersService.findById(decoded.userID);
         if (!user) {
           throw new UnauthorizedException('User not found');
         }
-        const userId = new Types.ObjectId(decoded.sub);
         if (user.token_version !== decoded.version) {
           throw new UnauthorizedException(
             'Token has been invalidated (logged out)',
@@ -680,14 +676,20 @@ export class AuthService {
     userAgent?: string,
     success = true,
   ) {
-    await this.knex('user_login_history').insert({
-      user_id: userId,
-      login_method: method,
-      device_id: deviceId ?? null,
-      ip_address: ip ?? null,
-      user_agent: userAgent ?? null,
-      success,
-      created_at: this.knex.fn.now(),
+    await this.knex.transaction(async (trx) => {
+      // Insert login history
+      await trx('user_login_history').insert({
+        user_id: userId,
+        login_method: method,
+        device_id: deviceId ?? null,
+        ip_address: ip ?? null,
+        user_agent: userAgent ?? null,
+        success,
+        created_at: trx.fn.now(),
+      });
+
+      // Update token_version
+      await trx('users').where({ id: userId }).increment('token_version', 1);
     });
   }
 }

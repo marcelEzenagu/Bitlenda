@@ -14,8 +14,13 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 
 import { CreateAccountDto } from 'src/auth/dto/create-auth.dto';
-import { SetPinDto } from './dto/update-user.dto';
+import {
+  SetPinDto,
+  VerificationDto,
+  VerificationSection,
+} from './dto/update-user.dto';
 import { AuthService } from 'src/auth/auth.service';
+import { first } from 'rxjs';
 
 @Injectable()
 export class UserService {
@@ -166,5 +171,40 @@ export class UserService {
 
   async verifyPin(pin: string, hash: string): Promise<boolean> {
     return bcrypt.compare(pin, hash);
+  }
+
+  async handleVerification(userID: string, dto: VerificationDto) {
+    try {
+      const foundUser = await this.findById(userID);
+
+      let field;
+      if (dto.section == VerificationSection.BASIC_INFO) {
+        dto.bvn = undefined;
+        field = {
+          first_name: dto.firstName,
+          last_name: dto.lastName,
+          dob: dto.dob,
+          country: dto.countryOfResidence,
+        };
+      } else {
+        if (foundUser.loan_bal <= 0) {
+          throw new Error('complete an active loan to set your bvn');
+        }
+        field = {
+          bvn: dto.bvn,
+        };
+      }
+
+      await this.knex<User>('users').where({ id: userID }).update(field);
+
+      // Return updated user
+      const updatedUser = await this.findById(userID);
+      if (!updatedUser) throw new NotFoundException('User not found');
+
+      updatedUser.password_hash = undefined;
+      return updatedUser;
+    } catch (e) {
+      console.log('ERROR== ', e);
+    }
   }
 }

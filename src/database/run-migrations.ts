@@ -1,21 +1,18 @@
-import { knex } from 'knex';
 import * as dotenv from 'dotenv';
-
 dotenv.config();
+import { knex } from 'knex';
+
 import * as fs from 'fs';
-import * as path from 'path';
-import { createDatabaseIfNotExists } from './create-database';
 const {
   PG_HOST,
   PG_PASS,
   PG_USER,
   PG_PORT,
-  MY_PASS,
-  MY_HOST,
-  MY_USER,
-  MY_PORT,
-  SELECTED_DB,
   DB_NAME,
+  MY_HOST,
+  MY_PORT,
+  MY_USER,
+  MY_PASS,
 } = process.env;
 (async () => {
   // await createDatabaseIfNotExists();
@@ -37,10 +34,10 @@ const {
           },
         }
       : {
-          host: PG_HOST,
-          port: Number(PG_PORT),
-          user: PG_USER,
-          password: PG_PASS,
+          host: MY_HOST,
+          port: Number(MY_PORT),
+          user: MY_USER,
+          password: MY_PASS,
           database: DB_NAME,
 
           ssl: {

@@ -24,11 +24,8 @@ export class SetPinDto {
 }
 
 export enum VerificationSection {
-  PERSONAL_INFO = 'PERSONAL_INFO',
-  COUNTRY_RESIDENCE = 'COUNTRY_RESIDENCE',
-  CONTACT_INFO = 'CONTACT_INFO',
+  BASIC_INFO = 'BASIC_INFO',
   REGULATORY_INFO = 'REGULATORY_INFO',
-  COMPLETED = 'COMPLETED',
 }
 
 export class VerificationDto {
@@ -84,7 +81,7 @@ export class VerificationDto {
     enum: VerificationSection,
     description:
       'Indicates which section the user is currently submitting data for',
-    example: VerificationSection.PERSONAL_INFO,
+    example: VerificationSection.BASIC_INFO,
   })
   @IsEnum(VerificationSection)
   section: VerificationSection;

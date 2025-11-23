@@ -132,6 +132,7 @@ export interface User {
   is_verified?: boolean;
   status?: string;
   token_version?: number;
+  loan_bal: number;
   created_at?: Date;
   role: RoleName;
   last_login: Date;

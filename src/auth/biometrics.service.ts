@@ -171,7 +171,7 @@ export class BiometricsService extends AuthService {
         email: user.email,
         role: user.role,
         isVerified: user.is_verified,
-        version: user.token_version,
+        version: (user.token_version += 1),
       };
       // generate tokens
       const accessToken = this.jwtService.sign(tokenPayload, {
