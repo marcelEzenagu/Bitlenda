@@ -178,6 +178,7 @@ export class UserService {
       const foundUser = await this.findById(userID);
 
       let field;
+      // do non bvn verify
       if (dto.section == VerificationSection.BASIC_INFO) {
         dto.bvn = undefined;
         field = {
