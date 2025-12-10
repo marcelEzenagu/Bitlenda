@@ -10,7 +10,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.redisClient.on('error', (err) =>
       console.log('Redis Client Error', err),
     );
-    this.redisClient.connect();
+    await this.redisClient.connect();
   }
 
   async setValue(key: string, value: string): Promise<void> {

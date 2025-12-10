@@ -131,6 +131,7 @@ export interface User {
   is_phone_verified?: boolean;
   is_verified?: boolean;
   status?: string;
+  mexc_username?: string;
   token_version?: number;
   loan_bal: number;
   created_at?: Date;

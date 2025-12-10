@@ -208,4 +208,67 @@ export class UserService {
       console.log('ERROR== ', e);
     }
   }
+
+  async assignOrReturnMexcDetails(user: any) {
+    let username = user.mexc_username;
+
+    // If user already has a mexc_username → fetch keys and return
+    if (username) {
+      const creds = await this.knex('mexc_sub_accounts')
+        .select('api_key', 'secret_key', 'note')
+        .where('sub_account', username)
+        .first();
+
+      return {
+        mexc_username: username,
+        apiKey: creds.api_key,
+        secretKey: creds.secret_key,
+        memo: creds.note,
+        user: user,
+      };
+    }
+
+    // Otherwise assign new one
+    const trx = await this.knex.transaction();
+
+    try {
+      const subAccount = await trx('mexc_sub_accounts')
+        .where('assigned', 0)
+        .forUpdate()
+        .first();
+
+      if (!subAccount) {
+        await trx.rollback();
+        throw new Error('No available MEXC sub-accounts');
+      }
+
+      await trx('mexc_sub_accounts')
+        .where('sub_account', subAccount.sub_account)
+        .update({ assigned: 1 });
+
+      await trx('users')
+        .where('email', user.email)
+        .update({ mexc_username: subAccount.sub_account });
+
+      await trx.commit();
+
+      username = subAccount.sub_account;
+
+      const updatedUser = await this.knex('users')
+        .where('email', user.email)
+        .first();
+
+      return {
+        mexc_username: username,
+        apiKey: subAccount.api_key,
+        secretKey: subAccount.secret_key,
+        memo: subAccount.note,
+        user: updatedUser,
+      };
+    } catch (error) {
+      await trx.rollback();
+      console.error('assignOrReturnMexcDetails failed for', user.email, error);
+      throw error;
+    }
+  }
 }

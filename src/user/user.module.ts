@@ -8,9 +8,11 @@ import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { AccessTokenMiddleware } from 'src/common/middleware/auth.middleware';
 import { AuthModule } from 'src/auth/auth.module';
+import { MexcAssignMiddleware } from 'src/common/middleware/mexc.middleware';
+import { LoansModule } from 'src/loans/loans.module';
 
 @Module({
-  imports: [forwardRef(() => AuthModule)],
+  imports: [forwardRef(() => AuthModule), LoansModule],
   controllers: [UserController],
   providers: [UserService],
   exports: [UserService],
@@ -21,5 +23,12 @@ export class UserModule {
       .apply(AccessTokenMiddleware)
       // .exclude({ path: , method: RequestMethod.POST })
       .forRoutes(UserController);
+    consumer.apply(MexcAssignMiddleware).forRoutes(
+      { path: 'users/verify', method: RequestMethod.POST },
+      { path: 'users/request-loan', method: RequestMethod.POST },
+      { path: 'users/get-loan-address', method: RequestMethod.POST },
+      { path: 'users/take-loan', method: RequestMethod.POST },
+      // add more routes here...
+    );
   }
 }

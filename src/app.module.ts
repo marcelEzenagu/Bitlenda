@@ -4,9 +4,20 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { DatabaseModule } from './database/database.module';
+import { LoansModule } from './loans/loans.module';
+import { CountryCurrencyModule } from './country_currency/country_currency.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
-  imports: [AuthModule, UserModule, DatabaseModule],
+  imports: [
+    AuthModule,
+    ScheduleModule.forRoot(),
+
+    UserModule,
+    CountryCurrencyModule,
+    DatabaseModule,
+    LoansModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
