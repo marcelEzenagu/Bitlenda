@@ -4,6 +4,7 @@ import { TakeLoanDto } from './dto/loan.dto';
 import { MexcService } from 'src/common/mexc/mexc.service';
 import { KNEX_CONNECTION } from 'src/database/knex.config';
 import { RedisService } from 'src/common/redis.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 // import { generateShortId } from 'src/utils/generateId';
 @Injectable()
@@ -20,6 +21,212 @@ export class LoansService {
     this.loanPercent = Number(process.env.LOAN_PERCENT);
   }
 
+  @Cron(CronExpression.EVERY_3_HOURS)
+  async approveLoanCron() {
+    console.log(
+      'Running deposit cron job every 3 hours to check for handleApproveLoan...',
+    );
+
+    // await this.handleApproveLoan();
+  }
+  // @Cron(CronExpression.EVERY_3_HOURS)
+  async loadMexcAccount() {
+    console.log(
+      'Running deposit cron job every 3 hours to check for handleApproveLoan...',
+    );
+
+    // MEXC
+    await this.createMexSubAccountsBatch();
+  }
+  async createMexSubAccountsBatch() {
+    console.log('RUNNING createMexSubAccountsBatch');
+
+    const prefix = 'bitlendA';
+    const start = 1;
+    const end = 10;
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    for (let i = start; i <= end; i++) {
+      const subAccount = `${prefix}${i}`;
+      const note = subAccount;
+
+      console.log(`Processing ${subAccount}`);
+
+      try {
+        //  Create subaccount API key
+        const res = await this.mexcService.createSubAccountApiKey(
+          subAccount,
+          note,
+        );
+
+        // 730101 = already exists on MEXC
+        if (res.code === '730101') {
+          console.log(`${subAccount} already exists on MEXC — skipping`);
+          continue;
+        }
+
+        // Insert only on success
+        await this.knex('mexc_sub_accounts').insert({
+          sub_account: subAccount,
+          note,
+          api_key: res.apikey,
+          secret_key: res.secretKey,
+          created_at: new Date(),
+        });
+
+        console.log(`${subAccount} created`);
+      } catch (err) {
+        // duplicate insert = safe retry
+        if (err.code === 'ER_DUP_ENTRY') {
+          console.log(`${subAccount} already in DB — skipping`);
+          continue;
+        }
+
+        console.error(`Failed on ${subAccount}`, err);
+      }
+
+      // ⏱ respect rate limits
+      await sleep(3000);
+    }
+
+    console.log('All subaccounts processed');
+  }
+
+  async addMex() {
+    console.log('RUNNING createMexSub_Account — inserting M1–M13');
+
+    const prefix = 'kochureM';
+    const start = 1;
+    const end = 1000;
+
+    for (let i = start; i <= end; i++) {
+      const subAccountName = `${prefix}${i}`;
+      console.log(`Inserting subaccount: ${subAccountName}`);
+
+      try {
+        await this.knex('mexc_sub_accounts').insert({
+          sub_account: subAccountName,
+          note: subAccountName,
+          created_at: new Date(),
+        });
+      } catch (err) {
+        console.error(`Error inserting subaccount ${subAccountName}:`, err);
+      }
+    }
+
+    console.log('All subaccounts inserted');
+  }
+
+  async handleApproveLoan() {
+    // get assetDeposits
+    const startTime = new Date().getMilliseconds();
+
+    const deposits = await this.mexcService.getSubAccountDeposits(startTime);
+
+    let recordsLength = 0;
+    if (deposits != undefined && deposits.length > 0) {
+      for (const recharge of deposits) {
+        recordsLength++;
+        console.log('RECORD', recordsLength, 'OUT OF ', deposits.length);
+        const unlockConfirm = Number(recharge.unlockConfirm);
+        const confirmTimes = Number(recharge.confirmTimes);
+
+        let { coin, amount, status, address, txId, memo } = recharge;
+
+        if (status == '5' && confirmTimes >= unlockConfirm) {
+          if (coin.split('-').length > 0) {
+            coin = coin.split('-')[0];
+          }
+
+          const pendingLoanStr = await this.redisClient.getValue(
+            'deposit_' + address,
+          );
+          if (pendingLoanStr) {
+            const pendingLoan = JSON.parse(pendingLoanStr);
+
+            // get assetBalance for the loanAsset
+            const { coin, amount, collateralAmount, repayment_amount, txid } =
+              pendingLoan;
+            if (pendingLoan.coin.toUpperCase() == coin.toUpperCase()) {
+              // compare with pendingLoans with assetBalance;
+              const asset = await this.knex('assets')
+                .where({ email: pendingLoan.email, coin: coin })
+                .first();
+              if (asset) {
+                const userAssetBalance = Number(asset.balance);
+                if (userAssetBalance >= pendingLoan.amountInAsset) {
+                  const trx = await this.knex.transaction();
+
+                  // lock bal for update
+                  const availableBalResponse = await trx.raw(
+                    'SELECT bal FROM users WHERE email=? FOR UPDATE',
+                    [pendingLoan.email],
+                  );
+                  try {
+                    // increase user-naira balance by deposit.amount
+                    await trx('users')
+                      .where({ email: pendingLoan.email })
+                      .increment({ bal: pendingLoan.amount })
+                      .update({});
+
+                    // markLoan as approved and notify user
+                    await trx('loans')
+                      .insert({
+                        email: pendingLoan.email,
+                        requested_amount: amount,
+                        repayment_amount,
+                        collateral_amount: collateralAmount,
+                        collateral_asset: coin,
+                        rate: this.loanPercent,
+                        deposit_txid: txid,
+                        status: 'APPROVED',
+                      })
+                      .onConflict('deposit_txid')
+                      .ignore();
+
+                    // put it in transaction log
+                    await trx('transactions').insert({
+                      type: 'LOAN_DISBURSE',
+                      user_id: '',
+                      direction: 'credit',
+                      amount: amount,
+                      description: '',
+                      asset: 'NGN',
+                      loan_id: '',
+                    });
+
+                    // put it in loanHistory log
+                  } catch (e) {
+                    console.log('Error approving loan: ', e);
+                  }
+                }
+              }
+            }
+            console.log(
+              `Approving loan for deposit to address ${address} of amount ${amount} ${coin}`,
+            );
+            // Logic to approve loan goes here
+          }
+        }
+      }
+    }
+    // redis-compare with pendingLoans;
+
+    // get assetBalance for the loanAsset
+    // increase user-naira balance by deposit.amount
+    // markLoan as approved and notify user
+    // put it in transaction log
+    // put it in loanHistory log
+    // Logic to check for new deposits goes here
+  }
+
+  handleCryptoDeposit() {
+    // get all deposits and compare with pendingLoans;
+    // if true, approve loan and notify user;
+    // increase assetBalance
+    return { amount: '', status: 1 };
+  }
   // async takeLoan(data: {
   //   userId: string;
   //   loanAmount: number;
@@ -75,7 +282,7 @@ export class LoansService {
   //   };
   // }
 
-  async requestLoan(dto: TakeLoanDto) {
+  async requestLoan(dto: TakeLoanDto, userEmail: string) {
     const { amount, cryptoType, address } = dto;
 
     if (!address) {
@@ -87,8 +294,8 @@ export class LoansService {
     // Calculate collateral requirements
     const repayment_amount = amount * (1 + this.loanPercent / 100);
     const collateral = amount * (1 + this.collateralPercent / 100);
-    // const collateralMinRequired =
-    //   amount * (1 + this.collateralPercent / 2 / 100);
+    const collateralMinRequired =
+      amount * (1 + this.collateralPercent / 2 / 100);
 
     const nairaRate = await this.getNairaRate();
     const collateralUSD = collateral / nairaRate;
@@ -111,6 +318,8 @@ export class LoansService {
       amountInAsset: Number(amountInAsset),
       collateralRequired: Number(collateralRequired),
       assetRateInNaira,
+      coin: cryptoType,
+      email: userEmail,
     };
 
     await this.redisClient.setTimedValue(
@@ -189,27 +398,52 @@ export class LoansService {
         .first();
       // const collateralRequired = collateralUSD / asset.price;
 
-      const addressDetails = await this.mexcService.getOrCreateSubAccAddress(
-        user,
-        cryptoType,
-        asset.network,
-      );
+      let wallet = await this.knex('wallets')
+        .where({
+          email: user.email,
+          coin: cryptoType,
+          network: asset.network,
+        })
+        .first();
+      let addressDetails = null;
+      if (!wallet) {
+        addressDetails = await this.mexcService.getOrCreateSubAccAddress(
+          user,
+          cryptoType,
+          asset.network,
+        );
+        addressDetails.chainName = undefined;
+        addressDetails.chainDisplayName = undefined;
 
-      let loanData = undefined;
-      if (addressDetails.address) {
         dto.address = addressDetails.address;
-
-        loanData = await this.requestLoan(dto);
+        await this.knex('wallets').insert({
+          asset_id: user.asset_id,
+          email: user.email,
+          provider_username: user.mexc_username,
+          network: addressDetails.network,
+          coin: dto.cryptoType,
+          address: addressDetails.address,
+          memo: addressDetails.memo ? addressDetails.memo : '',
+        });
+        wallet = addressDetails;
+      } else {
+        dto.address = wallet.address;
+        // wallet = addressDetails;
       }
+
+      // let loanData = undefined;
+
+      const loanData = await this.requestLoan(dto, user.email);
+      const { coin, network, address, memo } = wallet;
 
       return {
         message: 'address retrieved successfully.',
-        addressDetails,
+        addressDetails: { coin, network, address, memo },
         loanData,
       };
     } catch (err) {
       console.log('Error in getAddress: ', err);
-      // throw err;
+      throw err;
     }
   }
 
@@ -223,9 +457,6 @@ export class LoansService {
       amount * (1 + this.collateralPercent / 2 / 100);
 
     // Generate short ID for loan reference
-    const loanId = 'this.generateShortId();';
-
-    console.log('');
 
     // Insert loan record
     const [loan] = await this.knex('loans')

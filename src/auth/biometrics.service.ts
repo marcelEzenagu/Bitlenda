@@ -206,7 +206,7 @@ export class BiometricsService extends AuthService {
       user.bvn = undefined;
       user.password_hash = undefined;
 
-      return { success: 'OK', accessToken, refreshToken, user };
+      return { success: 'true', accessToken, refreshToken, user };
     } catch (e) {
       console.log('ERROR: ', e);
       throw e;

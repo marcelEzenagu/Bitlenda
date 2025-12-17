@@ -60,7 +60,7 @@ export class UserService {
 
       return {
         message: 'PIN set successfully',
-        success: 'OK',
+        success: 'true',
       };
     } catch (e) {
       console.log('ERROR: ', e);
@@ -269,6 +269,21 @@ export class UserService {
       await trx.rollback();
       console.error('assignOrReturnMexcDetails failed for', user.email, error);
       throw error;
+    }
+  }
+
+  async findOrCreateAssetWallet(email: string, coin: string) {
+    try {
+      let wallet = await this.knex('assets').where({ email, coin }).first();
+
+      if (!wallet) {
+        const id = this.generateShortId();
+        await this.knex('assets').insert({ email, coin });
+        wallet = await this.knex('assets').where({ email, coin }).first();
+      }
+      return wallet;
+    } catch (e) {
+      console.log('ERROR creating asset wallet: ', e);
     }
   }
 }

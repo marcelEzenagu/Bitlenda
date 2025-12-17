@@ -36,13 +36,13 @@ export class BiometricsController {
   }
 
   @Get('challenge')
-  @ApiOperation({ description: 'initiates the loginWithBioMetrics' })
+  @ApiOperation({ summary: 'initiates the loginWithBioMetrics' })
   async challenge(@Query('deviceId') deviceId: string) {
     return this.biometricsService.createChallenge(deviceId);
   }
 
   @Post('login')
-  @ApiOperation({ description: 'handles the loginWithBioMetrics' })
+  @ApiOperation({ summary: 'handles the loginWithBioMetrics' })
   async login(@Req() req, @Body() dto: BiometricsLoginDto) {
     const ip = req.ip || (req.headers && req.headers['x-forwarded-for']);
     const userAgent = req.headers['user-agent'] || '';
@@ -66,6 +66,7 @@ export class BiometricsController {
 
   @Post('rotate')
   @ApiBearerAuth('')
+  @ApiOperation({ summary: 'rotates biometrics on a newDevice' })
   @UseGuards(AuthGuard)
   async rotate(@Req() req, @Body() dto: RotateKeyDto) {
     const userId = req.user.id;
@@ -78,6 +79,7 @@ export class BiometricsController {
 
   @Get('status')
   @ApiBearerAuth('')
+  @ApiOperation({ summary: 'get biometrics status of a user' })
   @UseGuards(AuthGuard)
   async status(@Req() req) {
     return this.biometricsService.status(req.user.id);

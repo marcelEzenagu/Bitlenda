@@ -3,7 +3,7 @@ exports.up = async function (knex) {
   await knex.schema.createTable('loans', (table) => {
     table.increments('id').primary();
     // table.string('loan_id', 20).unique().notNullable();
-    table.string('user_id', 255).notNullable();
+    table.string('email', 255).notNullable();
 
     table.decimal('requested_amount', 14, 2).notNullable().defaultTo(0);
     table.decimal('balance', 14, 2).notNullable().defaultTo(0);
@@ -13,6 +13,7 @@ exports.up = async function (knex) {
     table.decimal('collateral_amount', 14, 2).nullable().defaultTo(0);
     table.decimal('repayment_amount', 14, 2).nullable().defaultTo(0);
     table.decimal('collateral_min_required', 14, 2).nullable().defaultTo(0);
+    table.string('deposit_txid', 80).unique().notNullable();
 
     table.decimal('rate', 5, 2).notNullable().defaultTo(0);
 
@@ -46,7 +47,16 @@ exports.up = async function (knex) {
   await knex.schema.createTable('transactions', (table) => {
     table.increments('id').primary();
 
-    table.enum('type', ['LOAN_DISBURSE', 'LOAN_REPAY']).notNullable();
+    table
+      .enum('type', [
+        'LOAN_DISBURSE',
+        'LOAN_REPAY',
+        'COIN_DEPOSIT',
+        'FIAT_DEPOSIT',
+        'COIN_WITHDRAW',
+        'FIAT_WITHDRAW',
+      ])
+      .notNullable();
 
     table
       .integer('loan_id')
@@ -60,9 +70,13 @@ exports.up = async function (knex) {
 
     table.decimal('amount', 14, 2).notNullable();
 
-    table.enum('status', ['PENDING', 'SUCCESS', 'FAILED']).defaultTo('SUCCESS');
+    table.enum('status', ['PENDING', 'SUCCESS', 'FAILED']).defaultTo('PENDING');
 
     table.string('reference', 40).unique().notNullable();
+    table.string('description', 40).nullable();
+    table.string('to', 255).nullable();
+    table.string('asset', 40).nullable();
+    table.enum('direction', ['credit', 'debit']).notNullable();
 
     table.timestamp('created_at').defaultTo(knex.fn.now());
   });

@@ -38,6 +38,7 @@ export class UserController {
   }
 
   @Post('request-loan')
+  @ApiOperation({ summary: 'Gets a loan breakdown' })
   @ApiResponse({
     schema: {
       example: {
@@ -60,6 +61,7 @@ export class UserController {
   }
 
   @Post('get-loan-address')
+  @ApiOperation({ summary: 'Gets address for a loanDeposit' })
   @ApiResponse({
     schema: {
       example: {
@@ -69,9 +71,6 @@ export class UserController {
           network: 'Ethereum(ERC20)',
           address: '0xd99ff56799ae030945429577fae639244d586597',
           memo: null,
-          chainName: 'Ethereum(ERC20)',
-          chainDisplayName: 'Ethereum(ERC20)',
-          netWork: 'ETH',
         },
         loanData: {
           rate: 5,
@@ -87,18 +86,26 @@ export class UserController {
     },
   })
   async getAddress(@Request() req, @Body() dto: TakeLoanDto) {
-    // const userID = req.claims['userID'];
+    const email = req.claims['email'];
     const user = req.mexcClient;
-    // console.log('REQ userID: ', req.user);
+
+    user.email = email;
+    const asset = await this.userService.findOrCreateAssetWallet(
+      email,
+      dto.cryptoType,
+    );
+    user.asset_id = asset.id;
+    user.mexc_username = user.memo;
+
     return await this.loansService.getAddress(user, dto);
   }
 
-  @Post('take-loan')
-  async takeLoan(@Request() req, @Body() dto: TakeLoanDto) {
-    const userID = req.claims['userID'];
+  // @Post('take-loan')
+  // async takeLoan(@Request() req, @Body() dto: TakeLoanDto) {
+  //   const userID = req.claims['userID'];
 
-    console.log('REQ userID: ', userID);
-    // console.log('REQ USER: ', req);
-    // return await this.userService.takeLoan(userID, dto);
-  }
+  //   console.log('REQ userID: ', userID);
+  //   // console.log('REQ USER: ', req);
+  //   // return await this.userService.takeLoan(userID, dto);
+  // }
 }

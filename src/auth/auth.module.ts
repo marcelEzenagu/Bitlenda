@@ -42,6 +42,9 @@ export class AuthModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(AccessTokenMiddleware)
-      .forRoutes({ path: 'auth/logout', method: RequestMethod.GET });
+      .forRoutes(
+        { path: 'auth/logout', method: RequestMethod.GET },
+        { path: 'auth/set-pin', method: RequestMethod.POST },
+      );
   }
 }

@@ -53,20 +53,24 @@ export class AuthController {
   @Post('set-pin')
   @ApiOperation({ summary: 'user sets transaction pin' })
   @ApiBody({ type: SetPinDto })
+  @ApiBearerAuth('')
   @ApiResponse({
     status: 200,
     description: 'Pin set successfully',
     schema: {
       example: {
-        success: 'OK',
+        success: 'true',
         message: 'Pin set successful',
       },
     },
   })
   async setPin(@Body() dto: SetPinDto, @Request() req) {
-    const { userID, email } = req.claims;
-
-    return await this.userService.setPin(userID, email, dto);
+    try {
+      const { userID, email } = req.claims;
+      return await this.userService.setPin(userID, email, dto);
+    } catch (e) {
+      console.log('ERROR:: ', e);
+    }
   }
 
   @Post('register-user')
@@ -74,7 +78,7 @@ export class AuthController {
   @ApiResponse({
     schema: {
       example: {
-        success: 'OK',
+        success: 'true',
         message: 'Registered successfully',
         next: 'verify-email',
       },
@@ -104,7 +108,7 @@ export class AuthController {
           lastActive: null,
           tokenVersion: 2,
         },
-        success: 'OK',
+        success: 'true',
         message: 'Email verified successfully',
       },
     },
@@ -122,7 +126,7 @@ export class AuthController {
     description: 'OTP resent successfully',
     schema: {
       example: {
-        success: 'OK',
+        success: 'true',
         next: 'verify-email',
         message: 'OTP sent successful',
       },
@@ -140,7 +144,7 @@ export class AuthController {
         access_token: 'user-access-token',
         refreshToken: '',
         user: {},
-        success: 'OK',
+        success: 'true',
       },
     },
   })
@@ -180,7 +184,7 @@ export class AuthController {
     schema: {
       example: {
         token: 'token for reset-password',
-        success: 'OK',
+        success: 'true',
       },
     },
   })
@@ -196,7 +200,7 @@ export class AuthController {
     schema: {
       example: {
         next: 'set-pin',
-        success: 'OK',
+        success: 'true',
         message: 'Password reset successful',
       },
     },

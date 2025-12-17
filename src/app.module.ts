@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module';
 import { LoansModule } from './loans/loans.module';
 import { CountryCurrencyModule } from './country_currency/country_currency.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { DepositsModule } from './deposits/deposits.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CountryCurrencyModule,
     DatabaseModule,
     LoansModule,
+    DepositsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

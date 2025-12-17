@@ -6,7 +6,7 @@ exports.up = async function (knex) {
   await knex.schema.alterTable('users', (table) => {
     table.date('dob').nullable(); // Date of birth
     table.string('mexc_username').nullable();
-    table.double('loan_bal').nullable(); // Double / float  });
+    table.double('bal').notNullable().defaultTo(0); // Double / float  });
   });
 };
 
@@ -17,7 +17,7 @@ exports.up = async function (knex) {
 exports.down = async function (knex) {
   await knex.schema.alterTable('users', (table) => {
     table.dropColumn('dob');
-    table.dropColumn('loan_bal');
+    table.dropColumn('bal');
     table.dropColumn('mexc_username');
   });
 };

@@ -6,7 +6,6 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import axios from 'axios';
 import { RedisService } from 'src/common/redis.service';
-const http = require('https');
 
 interface TransformedData {
   code: string;

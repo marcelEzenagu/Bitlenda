@@ -85,7 +85,7 @@ export class AuthService {
       await this.emailService.sendVerificationEmail(user.email, OTP);
 
       return {
-        success: 'OK',
+        success: 'true',
         message: 'Registered successfully',
         next: 'verify-email',
         // OTP,
@@ -108,7 +108,7 @@ export class AuthService {
         await this.emailService.sendVerificationEmail(user.email, OTP);
 
         return {
-          success: 'PENDING',
+          success: 'true',
           message: `Verification code sent to ${user.email}. Please verify to login.`,
         };
       }
@@ -142,7 +142,7 @@ export class AuthService {
         accessToken,
         refreshToken,
         user,
-        success: 'OK',
+        success: 'true',
       };
     } catch (e) {
       console.log('ERR:: ', e);
@@ -186,7 +186,7 @@ export class AuthService {
   //     await this.redisService.remove(key);
 
   //     return {
-  //       success: 'OK',
+  //       success : "true",
   //       token,
   //       user: user.toJSON(),
   //     };
@@ -313,7 +313,7 @@ export class AuthService {
       await this.emailService.sendVerificationEmail(user.email, OTP);
 
       return {
-        success: 'OK',
+        success: 'true',
         // OTP,
         next: otpType != 'reset-password' ? `verify-email` : undefined,
         message: 'OTP sent successful',
@@ -512,7 +512,7 @@ export class AuthService {
 
       return {
         message: 'A Password Reset OTP sent',
-        success: 'OK',
+        success: 'true',
         // OTP,
       };
     } catch (error) {
@@ -556,7 +556,7 @@ export class AuthService {
 
       return {
         token,
-        success: 'OK',
+        success: 'true',
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -592,7 +592,7 @@ export class AuthService {
         );
 
       return {
-        success: 'OK',
+        success: 'true',
         message,
         next: 'set-pin',
       };
