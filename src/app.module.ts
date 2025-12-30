@@ -8,6 +8,8 @@ import { LoansModule } from './loans/loans.module';
 import { CountryCurrencyModule } from './country_currency/country_currency.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DepositsModule } from './deposits/deposits.module';
+import { TransactionsModule } from './transactions/transactions.module';
+import { CronJobModule } from './cron-jobs/cron-jobs.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { DepositsModule } from './deposits/deposits.module';
     DatabaseModule,
     LoansModule,
     DepositsModule,
+    TransactionsModule,
+    CronJobModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -14,6 +14,7 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 
 import { CreateAccountDto } from 'src/auth/dto/create-auth.dto';
+import { HelperUtils } from 'src/common/helpers/helpers';
 import {
   SetPinDto,
   VerificationDto,
@@ -21,6 +22,7 @@ import {
 } from './dto/update-user.dto';
 import { AuthService } from 'src/auth/auth.service';
 import { first } from 'rxjs';
+import { WITHDRAW_TYPE, WithdrawDto } from './dto/withdrawal.dto';
 
 @Injectable()
 export class UserService {
@@ -188,7 +190,7 @@ export class UserService {
           country: dto.countryOfResidence,
         };
       } else {
-        if (foundUser.loan_bal <= 0) {
+        if (foundUser.bal <= 0) {
           throw new Error('complete an active loan to set your bvn');
         }
         field = {
@@ -203,7 +205,7 @@ export class UserService {
       if (!updatedUser) throw new NotFoundException('User not found');
 
       updatedUser.password_hash = undefined;
-      return updatedUser;
+      return { user: updatedUser, success: 'true' };
     } catch (e) {
       console.log('ERROR== ', e);
     }
@@ -277,13 +279,118 @@ export class UserService {
       let wallet = await this.knex('assets').where({ email, coin }).first();
 
       if (!wallet) {
-        const id = this.generateShortId();
         await this.knex('assets').insert({ email, coin });
         wallet = await this.knex('assets').where({ email, coin }).first();
       }
       return wallet;
     } catch (e) {
       console.log('ERROR creating asset wallet: ', e);
+    }
+  }
+
+  async userTransactions(email: string, page = 1, perPage = 20) {
+    const offset = (page - 1) * perPage;
+
+    const data = await this.knex('transactions')
+      .where({ email })
+      .orderBy('created_at', 'desc')
+      .limit(perPage)
+      .offset(offset);
+
+    const [{ total }] = await this.knex('transactions')
+      .where({ email })
+      .count('* as total');
+
+    return {
+      data,
+      pagination: {
+        page,
+        perPage,
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / perPage),
+      },
+      success: 'true',
+    };
+  }
+
+  async Withdraw(email, dto: WithdrawDto) {
+    const { amount, withdrawType, asset } = dto;
+    if (withdrawType == WITHDRAW_TYPE.CASH) {
+      // lock bal for update
+      const trx = await this.knex.transaction();
+      try {
+        const reference = HelperUtils.generateReferenceNo();
+        const availableBalResponse = await trx.raw(
+          'SELECT bal FROM users WHERE email=? FOR UPDATE',
+          [email],
+        );
+
+        const balance = availableBalResponse[0][0]['bal'];
+        console.log(
+          balance,
+          // amount > availableBalResponse,
+          'BALANC',
+          availableBalResponse[0][0],
+        );
+        // return;
+        if (amount > balance) {
+          throw new BadRequestException('insufficient balance');
+        }
+        await trx('transactions').insert({
+          type: 'FIAT_WITHDRAW',
+          email,
+          direction: 'debit',
+          amount: amount,
+          description: `withdrawal of ${amount}NGN`,
+          asset: 'NGN',
+          reference,
+        });
+        // debit users
+        await trx('users').where({ email }).decrement({ bal: amount });
+
+        // record withdrawal
+        // record transaction
+        //notification
+
+        await trx.commit();
+        return {
+          success: 'true',
+          message: 'withdrawal successful',
+        };
+      } catch (e) {
+        await trx.rollback();
+        console.log('ERROR', e);
+        throw e;
+      }
+    }
+  }
+
+  async saveToken(email: string, token: string) {
+    try {
+      const now = new Date();
+
+      const exists = await this.knex('fcm_tokens').where({ email }).first();
+
+      if (exists) {
+        // User already has a token → replace it
+        await this.knex('fcm_tokens').where({ email }).update({
+          token,
+          updated_at: now,
+        });
+      } else {
+        // First-time token
+        await this.knex('fcm_tokens').insert({
+          email,
+          token,
+        });
+      }
+
+      return {
+        success: 'true',
+        message: 'token added successfully',
+      };
+    } catch (e) {
+      console.log('ERROR:: ', e);
     }
   }
 }

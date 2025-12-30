@@ -21,6 +21,11 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "vercel-build": "nest build && cp -r src/database/cert dist/database/",
     "down": "knex migrate:rollback",
+    "up": "knex migrate:up",
+    "unlock": "knex migrate:unlock",
+    "list": "knex migrate:list",
+    "up_run": "knex migrate:up 20251228100606_create_deposit_account_and_notification_tables.js",
+    "latest": "knex migrate:latest",
     "db:create": "ts-node src/database/create-database.ts",
     "db:migrate": "ts-node src/database/run-migrations.ts"
   },

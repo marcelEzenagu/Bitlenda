@@ -53,10 +53,12 @@ export class MexcService {
 
   // Generic signed request method
   async signedRequest(method, path, bodyParams?: any, user?: any) {
-    const secret = user.secretKey ? user.secretKey : this.SECRET_KEY;
-    const key = user.apiKey ? user.apiKey : this.API_KEY;
+    const secret = user && user.secretKey ? user.secretKey : this.SECRET_KEY;
+    const key = user && user.apiKey ? user.apiKey : this.API_KEY;
     const { sign, timestamp } = this.sign(secret);
 
+    console.log('KEY: ', key);
+    console.log('secret_KEY: ', secret);
     let url;
     if (method !== 'POST') {
       const params = new URLSearchParams(bodyParams).toString();
@@ -107,12 +109,32 @@ export class MexcService {
       note,
     };
 
-    return await this.signedRequest(
+    const options = {
+      apiKey: this.API_KEY,
+      apiSecret: this.SECRET_KEY,
+      baseURL: this.BASE_URL,
+    };
+
+    const client = new APIBase(options);
+
+    // const response = await client.signRequest(
+    //   'POST',
+    //   '/api/v3/broker/sub-account/virtualSubAccount',
+    //   body,
+    // );
+    // console.log('response.data', response.data);
+
+    // console.log('FOUND RECHARGE:: ', response, 'BODY', body);
+    // return;
+
+    const response = await this.signedRequest(
       'POST',
       '/api/v3/broker/sub-account/virtualSubAccount',
       body,
       {},
     );
+    console.log('response.data', response);
+    return response;
   }
 
   async createSubAccountDepositAddress(user, coin, network) {
@@ -216,29 +238,53 @@ export class MexcService {
   }
 
   async createSubAccountApiKey(subAccount, note) {
-    const body = {
-      subAccount,
-      note,
-      permissions:
-        'SPOT_ACCOUNT_READ,SPOT_ACCOUNT_WRITE,SPOT_DEPOSIT_READ,SPOT_DEPOSIT_WRITE',
-    };
+    try {
+      const body = {
+        subAccount,
+        note,
+        permissions:
+          'SPOT_ACCOUNT_READ,SPOT_ACCOUNT_WRITE,SPOT_DEPOSIT_READ,SPOT_DEPOSIT_WRITE',
+      };
 
-    const response = await this.signedRequest(
-      'POST',
-      '/api/v3/broker/sub-account/apiKey',
-      body,
-    );
-    return response;
+      const response = await this.signedRequest(
+        'POST',
+        '/api/v3/broker/sub-account/apiKey',
+        body,
+      );
+
+      // const options = {
+      //   apiKey: this.API_KEY,
+      //   apiSecret: this.SECRET_KEY,
+      //   baseURL: this.BASE_URL,
+      // };
+
+      // console.log('FOUND RECHARGE:: ', options);
+      // const client = new APIBase(options);
+
+      // const response = await client.signRequest(
+      //   'POST',
+      //   '/api/v3/broker/sub-account/apiKey',
+      //   body,
+      // );
+      // return response.data;
+
+      console.log('FOUND RECHARGE:: ', response, 'BODY', body);
+      // return;
+      return response;
+    } catch (e) {
+      console.log('ERROR: ', e);
+    }
   }
 
-  async getSubAccountDeposits(startTime) {
+  async getSubAccountDeposits() {
     try {
       const now = new Date();
 
       const data =
         now.getTime() - Number(process.env.RECHARGE_SECONDS_TIME) * 60 * 1000;
       const body = {
-        startTime: startTime ? startTime : data,
+        // startTime: startTime ? startTime : data,
+        startTime: data,
       };
 
       const options = {
@@ -255,7 +301,27 @@ export class MexcService {
         body,
       );
       console.log('FOUND RECHARGE:: ', response.data);
-      return response.data;
+
+      let res;
+      if (!response.data.length) {
+        res = [
+          {
+            amount: '0.003567050000000000000000000000',
+            coin: 'BTC',
+            network: 'Bitcoin(BTC)',
+            status: 5,
+            address: '37ToUtuRcE75okBb81Fjg4bjwrqjwscwZe',
+            txId: '508a4f421860eb4ab22086d176ed09f0cfd5c595d033e1bd9a40fbed03cfd8f0:0',
+            unlockConfirm: '3',
+            confirmTimes: '3',
+            insertTime: 1765787914000,
+            netWork: 'BTC',
+          },
+        ];
+      } else {
+        res = response.data;
+      }
+      return res;
     } catch (e) {
       const { data } = e.response;
 

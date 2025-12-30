@@ -133,8 +133,9 @@ export interface User {
   status?: string;
   mexc_username?: string;
   token_version?: number;
-  loan_bal: number;
+  bal: number;
   created_at?: Date;
   role: RoleName;
   last_login: Date;
+  withdraw_coin: number;
 }

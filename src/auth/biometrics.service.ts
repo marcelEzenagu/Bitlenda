@@ -56,7 +56,7 @@ export class BiometricsService extends AuthService {
         .where({ id: userId })
         .update({ has_biometrics: true, updated_at: this.knex.fn.now() });
 
-      return { message: 'Biometrics enabled' };
+      return { message: 'Biometrics enabled', success: 'true' };
     } catch (e) {
       console.log('ERROR:: ', e);
     }
@@ -80,7 +80,7 @@ export class BiometricsService extends AuthService {
       this.CHALLENGE_TTL_SECONDS,
     );
 
-    return { challenge };
+    return { challenge, success: 'true' };
   }
 
   async loginWithBiometrics(
@@ -233,7 +233,7 @@ export class BiometricsService extends AuthService {
         .update({ has_biometrics: false, updated_at: this.knex.fn.now() });
     }
 
-    return { message: 'Biometrics disabled' };
+    return { message: 'Biometrics disabled', success: 'true' };
   }
 
   async rotateKey(userId: string, deviceId: string, newPublicKey: string) {
@@ -244,7 +244,7 @@ export class BiometricsService extends AuthService {
     await this.knex('user_devices')
       .where({ id: device.id })
       .update({ public_key: newPublicKey, updated_at: this.knex.fn.now() });
-    return { message: 'Public key rotated' };
+    return { message: 'Public key rotated', success: 'true' };
   }
 
   async status(userId: string) {
@@ -252,7 +252,7 @@ export class BiometricsService extends AuthService {
       .where({ user_id: userId })
       .select('device_id', 'biometrics_enabled', 'last_used_at');
     const hasBiometrics = devices.some((d) => d.biometrics_enabled);
-    return { hasBiometrics, devices };
+    return { hasBiometrics, devices, success: 'true' };
   }
 
   verifySignature(

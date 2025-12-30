@@ -15,4 +15,12 @@ export class HelperUtils {
       return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
     }
   }
+
+  static generateReferenceNo() {
+    let text = '';
+    let possible = 'ABDEFGHIJLMNOPTUVWXYZ01236789';
+    for (let i = 0; i < 16; i++)
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    return text;
+  }
 }

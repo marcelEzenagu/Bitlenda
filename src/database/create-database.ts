@@ -17,7 +17,7 @@ const {
   DB_NAME,
 } = process.env;
 
-const dbName = DB_NAME || 'defaultdb';
+const dbName = DB_NAME;
 
 export async function createDatabaseIfNotExists() {
   const isPg = SELECTED_DB === 'PGSQL';

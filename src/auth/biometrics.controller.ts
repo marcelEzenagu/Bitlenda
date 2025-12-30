@@ -28,7 +28,7 @@ export class BiometricsController {
   @UseGuards(AuthGuard)
   async enable(@Req() req, @Body() dto: EnableBiometricsDto) {
     const userId = req.user.id;
-    return this.biometricsService.enableBiometrics(
+    return await this.biometricsService.enableBiometrics(
       userId,
       dto.deviceId,
       dto.publicKey,
@@ -38,7 +38,7 @@ export class BiometricsController {
   @Get('challenge')
   @ApiOperation({ summary: 'initiates the loginWithBioMetrics' })
   async challenge(@Query('deviceId') deviceId: string) {
-    return this.biometricsService.createChallenge(deviceId);
+    return await this.biometricsService.createChallenge(deviceId);
   }
 
   @Post('login')
@@ -46,7 +46,7 @@ export class BiometricsController {
   async login(@Req() req, @Body() dto: BiometricsLoginDto) {
     const ip = req.ip || (req.headers && req.headers['x-forwarded-for']);
     const userAgent = req.headers['user-agent'] || '';
-    return this.biometricsService.loginWithBiometrics(
+    return await this.biometricsService.loginWithBiometrics(
       dto.deviceId,
       dto.challenge,
       //   dto.signature,
@@ -61,7 +61,10 @@ export class BiometricsController {
   @UseGuards(AuthGuard)
   async disable(@Req() req, @Body() body: { deviceId?: string }) {
     const userId = req.user.id;
-    return this.biometricsService.disableBiometrics(userId, body.deviceId);
+    return await this.biometricsService.disableBiometrics(
+      userId,
+      body.deviceId,
+    );
   }
 
   @Post('rotate')
@@ -70,7 +73,7 @@ export class BiometricsController {
   @UseGuards(AuthGuard)
   async rotate(@Req() req, @Body() dto: RotateKeyDto) {
     const userId = req.user.id;
-    return this.biometricsService.rotateKey(
+    return await this.biometricsService.rotateKey(
       userId,
       dto.deviceId,
       dto.newPublicKey,
@@ -82,6 +85,6 @@ export class BiometricsController {
   @ApiOperation({ summary: 'get biometrics status of a user' })
   @UseGuards(AuthGuard)
   async status(@Req() req) {
-    return this.biometricsService.status(req.user.id);
+    return await this.biometricsService.status(req.user.id);
   }
 }

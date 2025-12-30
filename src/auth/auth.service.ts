@@ -247,7 +247,7 @@ export class AuthService {
       await this.redisService.remove(redisKey);
       if (verifiedUser.role == RoleName.ADMIN) {
         return {
-          success: true,
+          success: 'true',
           message: 'Email verified successfully',
         };
       }
@@ -263,7 +263,7 @@ export class AuthService {
 
       return {
         token: access_token,
-        success: true,
+        success: 'true',
         message: 'Email verified successfully',
       };
     } catch (err) {
@@ -314,7 +314,6 @@ export class AuthService {
 
       return {
         success: 'true',
-        // OTP,
         next: otpType != 'reset-password' ? `verify-email` : undefined,
         message: 'OTP sent successful',
       };
@@ -374,7 +373,7 @@ export class AuthService {
     await this.emailService.sendVerificationEmail(user.email, OTP);
 
     return {
-      success: true,
+      success: 'true',
       // OTP,
       next: `verify-${emailType}`,
       message: `OTP sent successfully to ${dto.email}`,
@@ -513,7 +512,6 @@ export class AuthService {
       return {
         message: 'A Password Reset OTP sent',
         success: 'true',
-        // OTP,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {

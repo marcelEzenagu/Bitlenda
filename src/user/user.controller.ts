@@ -7,11 +7,15 @@ import {
   Param,
   Delete,
   Request,
+  Query,
+  BadRequestException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -20,6 +24,7 @@ import { VerificationDto } from './dto/update-user.dto';
 import { TakeLoanDto } from 'src/loans/dto/loan.dto';
 import { Loan } from 'src/loans/entity/loan.entity';
 import { LoansService } from 'src/loans/loans.service';
+import { WITHDRAW_TYPE, WithdrawDto } from './dto/withdrawal.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -108,4 +113,155 @@ export class UserController {
   //   // console.log('REQ USER: ', req);
   //   // return await this.userService.takeLoan(userID, dto);
   // }
+  @Get('transactions')
+  @ApiResponse({
+    example: {
+      data: [
+        {
+          id: 44,
+          requested_amount: '1000.00',
+          balance: '1050.00',
+          amount_paid: '0.00',
+          collateral_asset: 'BTC',
+          collateral_amount: '0.00',
+          repayment_amount: '1050.00',
+          collateral_min_required: '0.00',
+          rate: '5.00',
+          status: 'APPROVED',
+          approved_by: null,
+          approved_at: null,
+          created_at: '2025-12-21T10:27:04.000Z',
+          updated_at: '2025-12-21T10:27:04.000Z',
+          deposit_txid:
+            '508a4f421860eb4ab22086d176ed09f0cfd5c595d033e1bd9a40fbed03cfd8f0:0',
+          email: 'marcelezenagu92@gmail.com',
+        },
+      ],
+      pagination: {
+        page: 1,
+        perPage: 20,
+        total: 1,
+        totalPages: 1,
+      },
+      success: 'true',
+    },
+  })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  async transactions(
+    @Request() req,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    const userID = req.claims['email'];
+
+    console.log('REQ userID: ', userID);
+    return await this.userService.userTransactions(
+      userID,
+      Number(page),
+      Number(limit),
+    );
+  }
+
+  @Get('loans')
+  @ApiResponse({
+    example: {
+      data: [
+        {
+          id: 44,
+          requested_amount: '1000.00',
+          balance: '1050.00',
+          amount_paid: '0.00',
+          collateral_asset: 'BTC',
+          collateral_amount: '0.00',
+          repayment_amount: '1050.00',
+          collateral_min_required: '0.00',
+          rate: '5.00',
+          status: 'APPROVED',
+          approved_by: null,
+          approved_at: null,
+          created_at: '2025-12-21T10:27:04.000Z',
+          updated_at: '2025-12-21T10:27:04.000Z',
+          deposit_txid:
+            '508a4f421860eb4ab22086d176ed09f0cfd5c595d033e1bd9a40fbed03cfd8f0:0',
+          email: 'marcelezenagu92@gmail.com',
+        },
+      ],
+      pagination: {
+        page: 1,
+        perPage: 20,
+        total: 1,
+        totalPages: 1,
+      },
+      success: 'true',
+    },
+  })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  async loans(
+    @Request() req,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    const userID = req.claims['email'];
+
+    return await this.loansService.getUserLoans(
+      userID,
+      Number(page),
+      Number(limit),
+    );
+  }
+
+  // add-bank
+  @Patch('add-bank')
+  async addbank() {
+    return 'coming soon';
+  }
+  // verify-bank
+  @Get('verify-bank')
+  async verifybank() {
+    return 'coming soon';
+  }
+
+  // withdraw
+  @Post('withdraw')
+  async WithdrawDto(@Body() dto: WithdrawDto, @Req() req) {
+    const userID = req.claims['email'];
+
+    console.log(
+      'dto.asset',
+      dto,
+      dto.withdrawType == WITHDRAW_TYPE.CRYPTO && !dto.asset,
+    );
+    if (dto.withdrawType == WITHDRAW_TYPE.CRYPTO && !dto.asset) {
+      throw new BadRequestException('asset required but missing');
+    }
+    const email = req.claims['email'];
+
+    return await this.userService.Withdraw(email, dto);
+  }
+
+  @Post('notifications-token')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['token'],
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Firebase Cloud Messaging token',
+          example: 'fcm_device_token_here',
+        },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'adds firebase token for user-notification' })
+  async saveFcmToken(@Req() req, @Body() body: { token: string }) {
+    if (!body?.token) {
+      throw new BadRequestException('token is required');
+    }
+    const email = req.claims['email'];
+
+    return await this.userService.saveToken(email, body.token);
+  }
 }

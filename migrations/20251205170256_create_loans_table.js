@@ -2,7 +2,6 @@ exports.up = async function (knex) {
   // LOANS TABLE
   await knex.schema.createTable('loans', (table) => {
     table.increments('id').primary();
-    // table.string('loan_id', 20).unique().notNullable();
     table.string('email', 255).notNullable();
 
     table.decimal('requested_amount', 14, 2).notNullable().defaultTo(0);
@@ -58,14 +57,6 @@ exports.up = async function (knex) {
       ])
       .notNullable();
 
-    table
-      .integer('loan_id')
-      .unsigned()
-      .nullable()
-      .references('id')
-      .inTable('loans')
-      .onDelete('SET NULL');
-
     table.integer('user_id').unsigned().notNullable().index();
 
     table.decimal('amount', 14, 2).notNullable();
@@ -74,9 +65,8 @@ exports.up = async function (knex) {
 
     table.string('reference', 40).unique().notNullable();
     table.string('description', 40).nullable();
-    table.string('to', 255).nullable();
-    table.string('asset', 40).nullable();
     table.enum('direction', ['credit', 'debit']).notNullable();
+    table.string('deposit_txid', 80).unique().notNullable();
 
     table.timestamp('created_at').defaultTo(knex.fn.now());
   });

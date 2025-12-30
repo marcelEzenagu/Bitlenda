@@ -1,16 +1,16 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { Knex } from 'knex';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { TakeLoanDto } from './dto/loan.dto';
 import { MexcService } from 'src/common/mexc/mexc.service';
+import { Knex } from 'knex';
 import { KNEX_CONNECTION } from 'src/database/knex.config';
 import { RedisService } from 'src/common/redis.service';
-import { Cron, CronExpression } from '@nestjs/schedule';
 
 // import { generateShortId } from 'src/utils/generateId';
 @Injectable()
-export class LoansService {
+export class LoansService implements OnModuleInit {
   private readonly collateralPercent: number;
   private readonly loanPercent: number;
+  private readonly loanProcessingTime: number;
 
   constructor(
     @Inject(KNEX_CONNECTION) private readonly knex: Knex,
@@ -19,31 +19,96 @@ export class LoansService {
   ) {
     this.collateralPercent = Number(process.env.COLLATERAL_PERCENT);
     this.loanPercent = Number(process.env.LOAN_PERCENT);
+    this.loanProcessingTime = Number(process.env.LOAN_PROCESSING_TIME);
   }
 
-  @Cron(CronExpression.EVERY_3_HOURS)
-  async approveLoanCron() {
-    console.log(
-      'Running deposit cron job every 3 hours to check for handleApproveLoan...',
-    );
-
+  async onModuleInit() {
+    // await this.loadMexcAccount();
+    // await this.loadMexcAccountKeys();
     // await this.handleApproveLoan();
   }
-  // @Cron(CronExpression.EVERY_3_HOURS)
+
   async loadMexcAccount() {
     console.log(
       'Running deposit cron job every 3 hours to check for handleApproveLoan...',
     );
 
-    // MEXC
     await this.createMexSubAccountsBatch();
   }
+
+  async loadMexcAccountKeys() {
+    console.log(
+      'Running deposit cron job every 3 hours to check for handleApproveLoan...',
+    );
+
+    // MEXC
+    await this.createMexSubAccountKeyBatch();
+  }
+
   async createMexSubAccountsBatch() {
     console.log('RUNNING createMexSubAccountsBatch');
 
     const prefix = 'bitlendA';
     const start = 1;
-    const end = 10;
+    const end = 50;
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    for (let i = start; i <= end; i++) {
+      const subAccount = `${prefix}${i}`;
+      const note = subAccount;
+
+      console.log(`Processing ${subAccount}`);
+
+      try {
+        const res = await this.mexcService.createSubAccount(subAccount, note);
+
+        //  Create subaccount API key
+        // const res = await this.mexcService.createSubAccountApiKey(
+        //   subAccount,
+        //   note,
+        // );
+
+        // 730101 = already exists on MEXC
+        console.log('RES: ', res, '\n', 'subAccount', subAccount);
+        if (res.code === '730101') {
+          console.log(`${subAccount} already exists on MEXC — skipping`);
+          continue;
+        }
+
+        // Insert only on success
+        await this.knex('mexc_sub_accounts').insert({
+          sub_account: subAccount,
+          note,
+          // api_key: res.apikey,
+          // secret_key: res.secretKey,
+          created_at: new Date(),
+        });
+
+        console.log(`${subAccount} created`);
+      } catch (err) {
+        // duplicate insert = safe retry
+        if (err.code === 'ER_DUP_ENTRY') {
+          console.log(`${subAccount} already in DB — skipping`);
+          continue;
+        }
+
+        console.error(`Failed on ${subAccount}`, err);
+      }
+
+      // ⏱ respect rate limits
+      await sleep(3000);
+    }
+
+    console.log('All subaccounts processed');
+  }
+
+  async createMexSubAccountKeyBatch() {
+    console.log('RUNNING createMexSubAccountKeyBatch');
+
+    const prefix = 'bitlendA';
+    const start = 1;
+    const end = 50;
 
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -61,25 +126,28 @@ export class LoansService {
         );
 
         // 730101 = already exists on MEXC
+        console.log('RES: ', res, '\n', 'subAccount', subAccount);
         if (res.code === '730101') {
-          console.log(`${subAccount} already exists on MEXC — skipping`);
+          console.log(`${subAccount} key already exists on MEXC — skipping`);
           continue;
         }
 
         // Insert only on success
-        await this.knex('mexc_sub_accounts').insert({
-          sub_account: subAccount,
-          note,
-          api_key: res.apikey,
-          secret_key: res.secretKey,
-          created_at: new Date(),
-        });
+        await this.knex('mexc_sub_accounts')
+          .where({
+            sub_account: subAccount,
+            note,
+          })
+          .update({
+            api_key: res.apikey,
+            secret_key: res.secretKey,
+          });
 
-        console.log(`${subAccount} created`);
+        console.log(`${subAccount} key created`);
       } catch (err) {
         // duplicate insert = safe retry
         if (err.code === 'ER_DUP_ENTRY') {
-          console.log(`${subAccount} already in DB — skipping`);
+          console.log(`${subAccount} key  already in DB — skipping`);
           continue;
         }
 
@@ -119,11 +187,34 @@ export class LoansService {
   }
 
   async handleApproveLoan() {
+    console.log('handleApproveLoan()');
     // get assetDeposits
-    const startTime = new Date().getMilliseconds();
+    // const col = await this.knex('loans')
+    //   .where({
+    //     deposit_txid:
+    //       '508a4f421860eb4ab22086d176ed09f0cfd5c595d033e1bd9a40fbed03cfd8f0:0',
+    //   })
+    //   .delete();
+    // const col2 = await this.knex('transactions')
+    //   .where({
+    //     reference:
+    //       'loan-508a4f421860eb4ab22086d176ed09f0cfd5c595d033e1bd9a40fbed03cfd8f0:0',
+    //   })
+    //   .delete();
+    // const col22 = await this.knex('users')
+    //   .where({
+    //     email: 'marcelezenagu92@gmail.com',
+    //   })
+    //   .update({ bal: 0 });
 
-    const deposits = await this.mexcService.getSubAccountDeposits(startTime);
+    // console.log('col== ', col);
+    // console.log('col== ', col2);
+    // console.log('col== ', col22);
+    // return;
+    // const startTime = new Date().getMilliseconds();
 
+    const deposits = await this.mexcService.getSubAccountDeposits();
+    console.log('DEPOSITS:  ', deposits);
     let recordsLength = 0;
     if (deposits != undefined && deposits.length > 0) {
       for (const recharge of deposits) {
@@ -139,14 +230,18 @@ export class LoansService {
             coin = coin.split('-')[0];
           }
 
-          const pendingLoanStr = await this.redisClient.getValue(
-            'deposit_' + address,
-          );
+          console.log('pendingLoanStr:: ');
+
+          const redisKey = 'deposit_' + address;
+
+          const pendingLoanStr = await this.redisClient.getValue(redisKey);
+
+          console.log('pendingLoanStr:: ', pendingLoanStr);
           if (pendingLoanStr) {
             const pendingLoan = JSON.parse(pendingLoanStr);
 
             // get assetBalance for the loanAsset
-            const { coin, amount, collateralAmount, repayment_amount, txid } =
+            const { coin, amount, collateralAmount, repayment_amount } =
               pendingLoan;
             if (pendingLoan.coin.toUpperCase() == coin.toUpperCase()) {
               // compare with pendingLoans with assetBalance;
@@ -154,59 +249,71 @@ export class LoansService {
                 .where({ email: pendingLoan.email, coin: coin })
                 .first();
               if (asset) {
-                const userAssetBalance = Number(asset.balance);
+                // mock asset above amount
+                asset.bal = pendingLoan.amountInAsset + 1;
+                console.log('enteres here 01', asset);
+                const userAssetBalance = Number(asset.bal);
+                console.log('enteres here 11', asset);
+                console.log('enteres here 11', pendingLoan.amountInAsset);
+                userAssetBalance;
                 if (userAssetBalance >= pendingLoan.amountInAsset) {
                   const trx = await this.knex.transaction();
-
-                  // lock bal for update
-                  const availableBalResponse = await trx.raw(
-                    'SELECT bal FROM users WHERE email=? FOR UPDATE',
-                    [pendingLoan.email],
-                  );
                   try {
-                    // increase user-naira balance by deposit.amount
+                    await trx('loans').insert({
+                      email: pendingLoan.email,
+                      requested_amount: amount,
+                      repayment_amount,
+                      balance: repayment_amount,
+                      collateral_amount: collateralAmount,
+                      collateral_asset: coin,
+                      rate: this.loanPercent,
+                      deposit_txid: txId,
+                      status: 'APPROVED',
+                    });
+
+                    // lock bal for update
+                    const availableBalResponse = await trx.raw(
+                      'SELECT bal FROM users WHERE email=? FOR UPDATE',
+                      [pendingLoan.email],
+                    );
+                    // increase user-naira balance by deposit.amount disable withdraw_coin
                     await trx('users')
                       .where({ email: pendingLoan.email })
                       .increment({ bal: pendingLoan.amount })
-                      .update({});
+                      .update({ withdraw_coin: 1 });
 
                     // markLoan as approved and notify user
-                    await trx('loans')
-                      .insert({
-                        email: pendingLoan.email,
-                        requested_amount: amount,
-                        repayment_amount,
-                        collateral_amount: collateralAmount,
-                        collateral_asset: coin,
-                        rate: this.loanPercent,
-                        deposit_txid: txid,
-                        status: 'APPROVED',
-                      })
-                      .onConflict('deposit_txid')
-                      .ignore();
 
+                    const reference = `loan-${txId}`;
                     // put it in transaction log
                     await trx('transactions').insert({
                       type: 'LOAN_DISBURSE',
-                      user_id: '',
+                      email: pendingLoan.email,
                       direction: 'credit',
                       amount: amount,
-                      description: '',
+                      description: 'Loan approved',
                       asset: 'NGN',
-                      loan_id: '',
+                      deposit_txid: txId,
+                      reference,
                     });
+                    console.log(
+                      `Approving loan for deposit to address ${address} of amount ${amount} ${coin}`,
+                    );
+                    await trx.commit();
+                    // await this.redisClient.remove(redisKey);
 
                     // put it in loanHistory log
                   } catch (e) {
+                    await trx.rollback();
                     console.log('Error approving loan: ', e);
                   }
                 }
               }
             }
-            console.log(
-              `Approving loan for deposit to address ${address} of amount ${amount} ${coin}`,
-            );
+
             // Logic to approve loan goes here
+          } else {
+            console.log('LOAN_REQUEST NOT_FOUND-OR-EXPIRED FOR ', address);
           }
         }
       }
@@ -227,6 +334,7 @@ export class LoansService {
     // increase assetBalance
     return { amount: '', status: 1 };
   }
+
   // async takeLoan(data: {
   //   userId: string;
   //   loanAmount: number;
@@ -325,7 +433,7 @@ export class LoansService {
     await this.redisClient.setTimedValue(
       'deposit_' + address,
       JSON.stringify(loan),
-      1800,
+      this.loanProcessingTime,
     );
 
     return loan;
@@ -372,6 +480,7 @@ export class LoansService {
     return {
       message: 'OK',
       loan,
+      success: 'true',
     };
   }
 
@@ -397,7 +506,19 @@ export class LoansService {
         .where('coin', cryptoType.toUpperCase())
         .first();
       // const collateralRequired = collateralUSD / asset.price;
+      console.log('asset', asset);
 
+      const updates = await this.knex('wallets')
+        .where({
+          email: user.email,
+          coin: cryptoType,
+        })
+        .update({
+          address: '37ToUtuRcE75okBb81Fjg4bjwrqjwscwZe',
+          network: asset.network,
+        });
+
+      console.log('USER:; ', updates);
       let wallet = await this.knex('wallets')
         .where({
           email: user.email,
@@ -405,8 +526,11 @@ export class LoansService {
           network: asset.network,
         })
         .first();
+      // console.log('USER_wallet:; ', wallet);
+
       let addressDetails = null;
       if (!wallet) {
+        console.log('USER');
         addressDetails = await this.mexcService.getOrCreateSubAccAddress(
           user,
           cryptoType,
@@ -414,8 +538,8 @@ export class LoansService {
         );
         addressDetails.chainName = undefined;
         addressDetails.chainDisplayName = undefined;
-
         dto.address = addressDetails.address;
+
         await this.knex('wallets').insert({
           asset_id: user.asset_id,
           email: user.email,
@@ -440,6 +564,7 @@ export class LoansService {
         message: 'address retrieved successfully.',
         addressDetails: { coin, network, address, memo },
         loanData,
+        success: 'true',
       };
     } catch (err) {
       console.log('Error in getAddress: ', err);
@@ -486,8 +611,29 @@ export class LoansService {
     };
   }
 
-  async getUserLoans(userId: string) {
-    return this.knex('loans').where({ userId }).orderBy('created_at', 'desc');
+  async getUserLoans(email: string, page = 1, perPage = 20) {
+    const offset = (page - 1) * perPage;
+
+    const data = await this.knex('loans')
+      .where({ email })
+      .orderBy('created_at', 'desc')
+      .limit(perPage)
+      .offset(offset);
+
+    const [{ total }] = await this.knex('loans')
+      .where({ email })
+      .count('* as total');
+
+    return {
+      data,
+      pagination: {
+        page,
+        perPage,
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / perPage),
+      },
+      success: 'true',
+    };
   }
 
   async getRangedLoans(params: { startDate: string; endDate: string }) {
