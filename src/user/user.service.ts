@@ -314,7 +314,7 @@ export class UserService {
   }
 
   async Withdraw(email, dto: WithdrawDto) {
-    const { amount, withdrawType, asset } = dto;
+    const { amount, withdrawType, asset, address } = dto;
     if (withdrawType == WITHDRAW_TYPE.CASH) {
       // lock bal for update
       const trx = await this.knex.transaction();
@@ -362,6 +362,58 @@ export class UserService {
         console.log('ERROR', e);
         throw e;
       }
+    } else if (withdrawType == WITHDRAW_TYPE.CRYPTO) {
+      const trx = await this.knex.transaction();
+      try {
+        const reference = HelperUtils.generateReferenceNo();
+
+        const assetBalResponse = await trx.raw(
+          'SELECT bal FROM assets WHERE email=? AND coin=? FOR UPDATE',
+          [email, asset],
+        );
+
+        if (assetBalResponse !== undefined) {
+          const balance = assetBalResponse[0][0]['bal'];
+
+          console.log(
+            balance,
+            // amount > assetBalResponse,
+            'BALANC',
+            assetBalResponse[0][0],
+          );
+          // return;
+          if (amount > balance) {
+            throw new BadRequestException('insufficient balance');
+          }
+          await trx('transactions').insert({
+            type: 'CRYPTO_WITHDRAW',
+            email,
+            direction: 'debit',
+            amount: amount,
+            description: ` Withdraw of  ${amount} ${asset} to ${address} `,
+            asset: 'NGN',
+            reference,
+          });
+          // debit users
+          await trx('users').where({ email }).decrement({ bal: amount });
+
+          // record withdrawal
+          // record transaction
+          //notification
+
+          await trx.commit();
+          return {
+            success: 'true',
+            message: 'withdrawal successful',
+          };
+        }
+      } catch (e) {
+        await trx.rollback();
+        console.log('ERROR', e);
+        throw e;
+      }
+      // check verification token
+      //record transaction and token withdraws
     }
   }
 

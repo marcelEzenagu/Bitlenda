@@ -225,7 +225,7 @@ export class UserController {
 
   // withdraw
   @Post('withdraw')
-  async WithdrawDto(@Body() dto: WithdrawDto, @Req() req) {
+  async Withdraw(@Body() dto: WithdrawDto, @Req() req) {
     const userID = req.claims['email'];
 
     console.log(
@@ -238,6 +238,7 @@ export class UserController {
     }
     const email = req.claims['email'];
 
+    return 'coming soon';
     return await this.userService.Withdraw(email, dto);
   }
 

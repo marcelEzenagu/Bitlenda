@@ -37,4 +37,12 @@ export class WithdrawDto {
   @IsString()
   @IsIn(['ETH', 'BTC'])
   asset?: string;
+
+  @ApiPropertyOptional({
+    example: '0xe..',
+    description: 'The crypto address to receive the coin',
+  })
+  @IsOptional()
+  @IsString()
+  address?: string;
 }

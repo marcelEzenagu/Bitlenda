@@ -57,7 +57,6 @@ exports.up = async function (knex) {
       table.string('tx_id').notNullable();
       table.string('reference').notNullable();
       table.string('bank_account_id').notNullable();
-      table.string('source_address').nullable();
       table.string('is_notified').nullable();
       table.decimal('amount', 14, 2).notNullable();
       table.decimal('amount_to_receive', 14, 2).notNullable();
