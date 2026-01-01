@@ -10,6 +10,7 @@ import {
   Query,
   BadRequestException,
   Req,
+  BadGatewayException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -24,7 +25,12 @@ import { VerificationDto } from './dto/update-user.dto';
 import { TakeLoanDto } from 'src/loans/dto/loan.dto';
 import { Loan } from 'src/loans/entity/loan.entity';
 import { LoansService } from 'src/loans/loans.service';
-import { WITHDRAW_TYPE, WithdrawDto } from './dto/withdrawal.dto';
+import {
+  ResendWithdrawTokenDto,
+  WITHDRAW_TYPE,
+  WithdrawDto,
+} from 'src/withdrawal/dto/withdrawal.dto';
+import { WithdrawalService } from 'src/withdrawal/withdrawal.service';
 
 @ApiTags('users')
 @Controller('users')
@@ -33,6 +39,7 @@ export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly loansService: LoansService,
+    private readonly withdrawService: WithdrawalService,
   ) {}
 
   @Post('verify')
@@ -114,6 +121,7 @@ export class UserController {
   //   // return await this.userService.takeLoan(userID, dto);
   // }
   @Get('transactions')
+  @ApiOperation({ summary: "Lists user's transactions" })
   @ApiResponse({
     example: {
       data: [
@@ -164,6 +172,7 @@ export class UserController {
   }
 
   @Get('loans')
+  @ApiOperation({ summary: "Lists user's loans" })
   @ApiResponse({
     example: {
       data: [
@@ -224,22 +233,66 @@ export class UserController {
   }
 
   // withdraw
-  @Post('withdraw')
+  @Post('withdraw-init')
+  @ApiResponse({
+    schema: { example: { success: 'true', message: 'token sent' } },
+  })
+  @ApiOperation({
+    summary: 'Initiates the withdrawal Process by sending a withdrawal-token',
+  })
+  async WithdrawInit(@Body() dto: WithdrawDto, @Req() req) {
+    const userID = req.claims['email'];
+
+    console.log(
+      'dto.asset',
+      dto,
+      dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset,
+    );
+    if (dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset) {
+      throw new BadRequestException('asset required but missing');
+    }
+    const email = req.claims['email'];
+
+    // return 'coming soon';
+    return await this.userService.initWithdraw(email, dto);
+  }
+
+  @Post('withdraw-resend-token')
+  @ApiOperation({
+    summary: 'Resends the withdrawal-token',
+  })
+  @ApiResponse({
+    schema: { example: { success: 'true', message: 'token resent' } },
+  })
+  async WithdrawResend(@Body() dto: ResendWithdrawTokenDto, @Req() req) {
+    const email = req.claims['email'];
+
+    return await this.userService.resendWithdrawToken(email, dto.withdrawType);
+  }
+  @Post('withdraw-confirm')
+  @ApiOperation({
+    summary: 'Completes the withdrawal Process by a user',
+  })
+  @ApiResponse({
+    schema: { example: { success: 'true', message: 'withdrawal successful' } },
+  })
   async Withdraw(@Body() dto: WithdrawDto, @Req() req) {
     const userID = req.claims['email'];
 
     console.log(
       'dto.asset',
       dto,
-      dto.withdrawType == WITHDRAW_TYPE.CRYPTO && !dto.asset,
+      dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset,
     );
-    if (dto.withdrawType == WITHDRAW_TYPE.CRYPTO && !dto.asset) {
+    if (dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset) {
       throw new BadRequestException('asset required but missing');
+    } else {
+      throw new BadGatewayException('coming soon');
     }
     const email = req.claims['email'];
 
-    return 'coming soon';
-    return await this.userService.Withdraw(email, dto);
+    // return 'coming soon';
+    return await this.withdrawService.withdraw(email, dto);
   }
 
   @Post('notifications-token')

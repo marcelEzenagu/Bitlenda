@@ -12,17 +12,18 @@ import { KNEX_CONNECTION } from 'src/database/knex.config';
 import { User, UserStatus } from './entities/user.entity';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { HelperUtils } from 'src/common/helpers/helpers';
 
 import { CreateAccountDto } from 'src/auth/dto/create-auth.dto';
-import { HelperUtils } from 'src/common/helpers/helpers';
 import {
   SetPinDto,
   VerificationDto,
   VerificationSection,
 } from './dto/update-user.dto';
 import { AuthService } from 'src/auth/auth.service';
-import { first } from 'rxjs';
-import { WITHDRAW_TYPE, WithdrawDto } from './dto/withdrawal.dto';
+import { RedisService } from 'src/common/redis.service';
+import { WITHDRAW_TYPE, WithdrawDto } from 'src/withdrawal/dto/withdrawal.dto';
+import { EmailService } from 'src/common/email.service';
 
 @Injectable()
 export class UserService {
@@ -30,6 +31,8 @@ export class UserService {
     @Inject(KNEX_CONNECTION) private readonly knex: Knex,
     @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
+    private readonly emailService: EmailService,
+    private redisService: RedisService,
   ) {}
 
   // Hash helper
@@ -99,7 +102,7 @@ export class UserService {
       .where({ id: userId })
       .increment('token_version', 1);
 
-    return { success: true, message: 'Logged out successfully' };
+    return { success: 'true', message: 'Logged out successfully' };
   }
 
   async markVerified(id: string, type: 'email' | 'phone'): Promise<User> {
@@ -313,110 +316,6 @@ export class UserService {
     };
   }
 
-  async Withdraw(email, dto: WithdrawDto) {
-    const { amount, withdrawType, asset, address } = dto;
-    if (withdrawType == WITHDRAW_TYPE.CASH) {
-      // lock bal for update
-      const trx = await this.knex.transaction();
-      try {
-        const reference = HelperUtils.generateReferenceNo();
-        const availableBalResponse = await trx.raw(
-          'SELECT bal FROM users WHERE email=? FOR UPDATE',
-          [email],
-        );
-
-        const balance = availableBalResponse[0][0]['bal'];
-        console.log(
-          balance,
-          // amount > availableBalResponse,
-          'BALANC',
-          availableBalResponse[0][0],
-        );
-        // return;
-        if (amount > balance) {
-          throw new BadRequestException('insufficient balance');
-        }
-        await trx('transactions').insert({
-          type: 'FIAT_WITHDRAW',
-          email,
-          direction: 'debit',
-          amount: amount,
-          description: `withdrawal of ${amount}NGN`,
-          asset: 'NGN',
-          reference,
-        });
-        // debit users
-        await trx('users').where({ email }).decrement({ bal: amount });
-
-        // record withdrawal
-        // record transaction
-        //notification
-
-        await trx.commit();
-        return {
-          success: 'true',
-          message: 'withdrawal successful',
-        };
-      } catch (e) {
-        await trx.rollback();
-        console.log('ERROR', e);
-        throw e;
-      }
-    } else if (withdrawType == WITHDRAW_TYPE.CRYPTO) {
-      const trx = await this.knex.transaction();
-      try {
-        const reference = HelperUtils.generateReferenceNo();
-
-        const assetBalResponse = await trx.raw(
-          'SELECT bal FROM assets WHERE email=? AND coin=? FOR UPDATE',
-          [email, asset],
-        );
-
-        if (assetBalResponse !== undefined) {
-          const balance = assetBalResponse[0][0]['bal'];
-
-          console.log(
-            balance,
-            // amount > assetBalResponse,
-            'BALANC',
-            assetBalResponse[0][0],
-          );
-          // return;
-          if (amount > balance) {
-            throw new BadRequestException('insufficient balance');
-          }
-          await trx('transactions').insert({
-            type: 'CRYPTO_WITHDRAW',
-            email,
-            direction: 'debit',
-            amount: amount,
-            description: ` Withdraw of  ${amount} ${asset} to ${address} `,
-            asset: 'NGN',
-            reference,
-          });
-          // debit users
-          await trx('users').where({ email }).decrement({ bal: amount });
-
-          // record withdrawal
-          // record transaction
-          //notification
-
-          await trx.commit();
-          return {
-            success: 'true',
-            message: 'withdrawal successful',
-          };
-        }
-      } catch (e) {
-        await trx.rollback();
-        console.log('ERROR', e);
-        throw e;
-      }
-      // check verification token
-      //record transaction and token withdraws
-    }
-  }
-
   async saveToken(email: string, token: string) {
     try {
       const now = new Date();
@@ -444,5 +343,82 @@ export class UserService {
     } catch (e) {
       console.log('ERROR:: ', e);
     }
+  }
+
+  async initWithdraw(email: string, dto: WithdrawDto) {
+    const { amount, withdrawType, asset, address } = dto;
+
+    // soft balance check (UX only)
+    if (withdrawType === WITHDRAW_TYPE.CASH_WITHDRAW) {
+      const row = await this.knex('users')
+        .select('bal')
+        .where({ email })
+        .first();
+
+      if (!row || amount > row.bal) {
+        throw new BadRequestException('insufficient balance');
+      }
+
+      dto.asset = undefined;
+      dto.address = undefined;
+    }
+
+    if (withdrawType === WITHDRAW_TYPE.CRYPTO_WITHDRAW) {
+      const row = await this.knex('assets')
+        .select('bal')
+        .where({ email, coin: asset })
+        .first();
+
+      if (!row || amount > row.bal) {
+        throw new BadRequestException('insufficient balance');
+      }
+    }
+
+    const token = this.authService.generateOtp();
+    const tokenHash = HelperUtils.hashToken(token);
+
+    const intent = HelperUtils.buildWithdrawIntent(dto);
+
+    const intentString = JSON.stringify(intent);
+
+    console.log('INIT intentString:', intentString);
+    console.log('INIT token:', token);
+
+    const intentHash = HelperUtils.hashToken(JSON.stringify(intent));
+
+    await this.redisService.setTimedValue(
+      `withdraw:intent:${email}:${withdrawType}`,
+      JSON.stringify({ tokenHash, intentHash, attempts: 0 }),
+      300,
+    );
+
+    await this.emailService.sendWithdrawalEmail(email, token, withdrawType);
+
+    return { success: 'true', message: 'token sent' };
+  }
+
+  async resendWithdrawToken(email: string, withdrawType) {
+    const cached = await this.redisService.getValue(
+      `withdraw:intent:${email}:${withdrawType}`,
+    );
+    if (!cached) {
+      throw new BadRequestException(`no active ${withdrawType} intent`);
+    }
+
+    const data = JSON.parse(cached);
+
+    const token = this.authService.generateOtp();
+    data.tokenHash = HelperUtils.hashToken(token);
+    data.attempts = 0;
+
+    await this.redisService.setTimedValue(
+      `withdraw:intent:${email}:${withdrawType}`,
+      JSON.stringify(data),
+      300,
+    );
+
+    await this.emailService.sendWithdrawalEmail(email, token, withdrawType);
+
+    return { success: 'true', message: 'token resent' };
   }
 }

@@ -10,11 +10,14 @@ import { AccessTokenMiddleware } from 'src/common/middleware/auth.middleware';
 import { AuthModule } from 'src/auth/auth.module';
 import { MexcAssignMiddleware } from 'src/common/middleware/mexc.middleware';
 import { LoansModule } from 'src/loans/loans.module';
+import { WithdrawalModule } from 'src/withdrawal/withdrawal.module';
+import { RedisService } from 'src/common/redis.service';
+import { EmailService } from 'src/common/email.service';
 
 @Module({
-  imports: [forwardRef(() => AuthModule), LoansModule],
+  imports: [forwardRef(() => AuthModule), LoansModule, WithdrawalModule],
   controllers: [UserController],
-  providers: [UserService],
+  providers: [UserService, RedisService, EmailService],
   exports: [UserService],
 })
 export class UserModule {

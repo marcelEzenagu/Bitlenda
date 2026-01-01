@@ -10,8 +10,8 @@ import {
 } from 'class-validator';
 
 export enum WITHDRAW_TYPE {
-  CRYPTO = 'CRYPTO',
-  CASH = 'CASH',
+  CRYPTO_WITHDRAW = 'CRYPTO_WITHDRAW',
+  CASH_WITHDRAW = 'CASH_WITHDRAW',
 }
 export class WithdrawDto {
   @ApiProperty({ example: 1000, description: 'The amount of loan to take' })
@@ -20,10 +20,11 @@ export class WithdrawDto {
   amount: number;
 
   @ApiProperty({
-    example: WITHDRAW_TYPE.CASH,
+    example: WITHDRAW_TYPE.CRYPTO_WITHDRAW,
     description: 'The type of withdrawal',
     enum: WITHDRAW_TYPE,
   })
+
   //   @IsString()
   @IsEnum(WITHDRAW_TYPE)
   withdrawType: WITHDRAW_TYPE;
@@ -45,4 +46,21 @@ export class WithdrawDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @ApiPropertyOptional({
+    example: '0544..',
+    description: 'The token sent to verify withdrawal',
+  })
+  @IsOptional()
+  @IsString()
+  token?: string;
+}
+export class ResendWithdrawTokenDto {
+  @ApiProperty({
+    example: WITHDRAW_TYPE.CRYPTO_WITHDRAW,
+    description: 'The type of withdrawal',
+    enum: WITHDRAW_TYPE,
+  })
+  @IsEnum(WITHDRAW_TYPE)
+  withdrawType: WITHDRAW_TYPE;
 }

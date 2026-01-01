@@ -18,18 +18,18 @@ export class CountryCurrencyController {
     private readonly countryCurrencyService: CountryCurrencyService,
   ) {}
 
-  @Get()
-  findAll() {
-    return this.countryCurrencyService.getCountries();
-  }
+  // @Get()
+  // findAll() {
+  //   return this.countryCurrencyService.getCountries();
+  // }
 
-  @Get('load')
-  LoadCountries() {
-    return this.countryCurrencyService.handleLoadCountry();
-  }
+  // @Get('load')
+  // LoadCountries() {
+  //   return this.countryCurrencyService.handleLoadCountry();
+  // }
 
-  @Get(':currencyCode')
-  findOne(@Param('currencyCode') currencyCode: string) {
-    return this.countryCurrencyService.getExchangeRate(currencyCode);
-  }
+  // @Get(':currencyCode')
+  // findOne(@Param('currencyCode') currencyCode: string) {
+  //   return this.countryCurrencyService.getExchangeRate(currencyCode);
+  // }
 }

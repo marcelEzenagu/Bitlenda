@@ -119,7 +119,7 @@ export class AuthController {
 
   // send-resendOTP
   @Post('resend-otp')
-  @ApiOperation({ summary: 'Resend OTP for email verification' })
+  @ApiOperation({ summary: 'Resend OTP for email verification ' })
   @ApiBody({ type: ResendOtpDto })
   @ApiResponse({
     status: 200,

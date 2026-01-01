@@ -10,6 +10,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { DepositsModule } from './deposits/deposits.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { CronJobModule } from './cron-jobs/cron-jobs.module';
+import { WithdrawalModule } from './withdrawal/withdrawal.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CronJobModule } from './cron-jobs/cron-jobs.module';
     DepositsModule,
     TransactionsModule,
     CronJobModule,
+    WithdrawalModule,
   ],
   controllers: [AppController],
   providers: [AppService],
