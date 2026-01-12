@@ -29,11 +29,10 @@ exports.up = async function (knex) {
   }
 
   const hasAltEmail = await knex.schema.hasColumn('users', 'alt_email');
-
   if (!hasAltEmail) {
     await knex.schema.alterTable('users', (table) => {
       if (!hasAltEmail) {
-        table.string('email', 255).nullable();
+        table.string('alt_email', 255).nullable();
       }
     });
   }

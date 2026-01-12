@@ -506,19 +506,16 @@ export class LoansService implements OnModuleInit {
         .where('coin', cryptoType.toUpperCase())
         .first();
       // const collateralRequired = collateralUSD / asset.price;
-      console.log('asset', asset);
 
+      // return;
       const updates = await this.knex('wallets')
         .where({
           email: user.email,
           coin: cryptoType,
         })
-        .update({
-          address: '37ToUtuRcE75okBb81Fjg4bjwrqjwscwZe',
-          network: asset.network,
-        });
+        .del();
 
-      console.log('USER:; ', updates);
+      // console.log('USER:; ', updates);
       let wallet = await this.knex('wallets')
         .where({
           email: user.email,
@@ -526,11 +523,9 @@ export class LoansService implements OnModuleInit {
           network: asset.network,
         })
         .first();
-      // console.log('USER_wallet:; ', wallet);
 
       let addressDetails = null;
       if (!wallet) {
-        console.log('USER');
         addressDetails = await this.mexcService.getOrCreateSubAccAddress(
           user,
           cryptoType,

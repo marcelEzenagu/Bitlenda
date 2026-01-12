@@ -331,6 +331,30 @@ export class UserController {
   @Patch('profile')
   async updateProfile(@Req() req, @Body() dto: UpdateProfileDto) {
     const email = req.claims['email'];
-    return this.userService.update(email, dto);
+    return await this.userService.update(email, dto);
+  }
+
+  @Get('assets')
+  @ApiResponse({
+    schema: {
+      example: {
+        assets: [
+          {
+            coin: 'ETH',
+            bal: 0,
+          },
+          {
+            coin: 'BTC',
+            bal: 0,
+          },
+        ],
+        success: 'true',
+      },
+    },
+  })
+  @ApiOperation({ summary: 'lists all user assets' })
+  async listAssets(@Req() req) {
+    const email = req.claims['email'];
+    return await this.userService.listAssetWallet(email);
   }
 }

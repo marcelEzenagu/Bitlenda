@@ -27,6 +27,10 @@ import { EmailService } from 'src/common/email.service';
 import { MexcService } from 'src/common/mexc/mexc.service';
 import { ProfileSection, UpdateProfileDto } from './dto/profile.dto';
 
+export interface AssetWallet {
+  bal: number;
+  coin: string;
+}
 @Injectable()
 export class UserService {
   constructor(
@@ -294,6 +298,22 @@ export class UserService {
     }
   }
 
+  async listAssetWallet(email: string) {
+    try {
+      let wallets = await this.knex('assets')
+        .where({ email })
+        .select('bal', 'coin');
+
+      if (!wallets) {
+        return { assets: [], success: 'true' };
+      }
+
+      return { assets: wallets.map(this.normalizeWallet), success: 'true' };
+    } catch (e) {
+      console.log('ERROR creating asset wallet: ', e);
+    }
+  }
+
   async userTransactions(email: string, page = 1, perPage = 20) {
     const offset = (page - 1) * perPage;
 
@@ -470,5 +490,12 @@ export class UserService {
 
   async updatePhone(email: string, phone: string) {
     return this.knex('users').where({ email }).update({ phone });
+  }
+
+  normalizeWallet(wallet: any): AssetWallet {
+    return {
+      coin: wallet.coin,
+      bal: Number(wallet.bal),
+    };
   }
 }
