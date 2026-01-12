@@ -24,6 +24,8 @@ import { AuthService } from 'src/auth/auth.service';
 import { RedisService } from 'src/common/redis.service';
 import { WITHDRAW_TYPE, WithdrawDto } from 'src/withdrawal/dto/withdrawal.dto';
 import { EmailService } from 'src/common/email.service';
+import { MexcService } from 'src/common/mexc/mexc.service';
+import { ProfileSection, UpdateProfileDto } from './dto/profile.dto';
 
 @Injectable()
 export class UserService {
@@ -33,6 +35,7 @@ export class UserService {
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
     private redisService: RedisService,
+    private readonly mexcService: MexcService,
   ) {}
 
   // Hash helper
@@ -372,6 +375,12 @@ export class UserService {
       if (!row || amount > row.bal) {
         throw new BadRequestException('insufficient balance');
       }
+
+      if (row.withdraw_coin != 0) {
+        throw new BadRequestException(
+          'you cannot make a withdraw, as you have uncleared loan',
+        );
+      }
     }
 
     const token = this.authService.generateOtp();
@@ -420,5 +429,46 @@ export class UserService {
     await this.emailService.sendWithdrawalEmail(email, token, withdrawType);
 
     return { success: 'true', message: 'token resent' };
+  }
+
+  async update(email, dto: UpdateProfileDto) {
+    switch (dto.section) {
+      case ProfileSection.PHONE:
+        return this.updatePhone(email, dto.phone!);
+
+      case ProfileSection.EMAIL:
+        return this.updateEmail(email, dto.email!);
+
+      case ProfileSection.NOK:
+        return this.addOrUpdateNok(email, dto.nok!);
+
+      default:
+        throw new BadRequestException('Invalid profile section');
+    }
+  }
+
+  async updateEmail(oldEmail: string, newEmail: string) {
+    await this.knex('users')
+      .where({ email: oldEmail })
+      .update({ alt_email: newEmail });
+  }
+
+  async addOrUpdateNok(email: string, nok) {
+    const existing = await this.knex('nok')
+      .where({ user_email: email })
+      .first();
+
+    if (existing) {
+      return this.knex('nok').where({ user_email: email }).update(nok);
+    }
+
+    return this.knex('nok').insert({
+      user_email: email,
+      ...nok,
+    });
+  }
+
+  async updatePhone(email: string, phone: string) {
+    return this.knex('users').where({ email }).update({ phone });
   }
 }

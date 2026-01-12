@@ -152,14 +152,12 @@ export class DepositsService {
 
   async confirmTokenDeposit(trx, deposit, user, usdVal) {
     try {
-      let { amount, coin, url, time, sourceAddress, txId, address } = deposit;
-      console.log('GOT TO confirmTokenDeposit', deposit);
+      let { amount, coin, time, sourceAddress, txId, address } = deposit;
       amount = Number(Number(amount).toFixed(8)).toString();
 
       let description = `You received ${amount} ${coin} from  ${sourceAddress}`;
       const email = user.email;
 
-      console.log('GOT TO confirmTokenDeposit 1');
       // start  transaction
       await trx.raw(
         'SELECT bal FROM assets WHERE email=? AND coin=? FOR UPDATE',
@@ -186,7 +184,6 @@ export class DepositsService {
         .increment('total_deposited', amount)
         .where({ email, coin });
 
-      console.log('usdVal::', usdVal);
       // update user total token deposit
       await trx('users')
         .increment('total_token_deposit', usdVal)

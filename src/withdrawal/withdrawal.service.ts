@@ -15,11 +15,13 @@ import { UpdateWithdrawalDto } from './dto/update-withdrawal.dto';
 import { HelperUtils } from 'src/common/helpers/helpers';
 import { WITHDRAW_TYPE, WithdrawDto } from './dto/withdrawal.dto';
 import { RedisService } from 'src/common/redis.service';
+import { MexcService } from 'src/common/mexc/mexc.service';
 
 @Injectable()
 export class WithdrawalService {
   constructor(
     @Inject(KNEX_CONNECTION) private readonly knex: Knex,
+    private readonly mexcService: MexcService,
 
     private redisService: RedisService,
   ) {}
@@ -149,7 +151,7 @@ export class WithdrawalService {
     }
   }
 
-  async withdraw(email: string, dto: WithdrawDto) {
+  async withdraw(email: string, username: string, dto: WithdrawDto) {
     try {
       const { amount, withdrawType, asset, address, token } = dto;
 
@@ -157,12 +159,12 @@ export class WithdrawalService {
         dto.asset = undefined;
         dto.address = undefined;
       }
-      // 1️⃣ validate redis intent
+      //  validate redis intent
       const cached = await this.redisService.getValue(
         `withdraw:intent:${email}:${withdrawType}`,
       );
 
-      console.log('cached', cached);
+      // console.log('cached', cached);
       if (!cached) {
         throw new BadRequestException('token required or expired');
       }
@@ -172,7 +174,7 @@ export class WithdrawalService {
 
       const intentString = JSON.stringify(intent);
 
-      console.log('WITHDRAW intentString:', intentString);
+      // console.log('WITHDRAW intentString:', intentString);
       console.log('REDIS intentHash:', data.intentHash);
       const intentHash = HelperUtils.hashToken(JSON.stringify(intent));
       console.log('WITHDRAW intentHash:', intentHash);
@@ -203,15 +205,26 @@ export class WithdrawalService {
             throw new BadRequestException('insufficient balance');
           }
 
-          await trx('transactions').insert({
-            type: 'BANK_WITHDRAW',
-            email,
-            direction: 'debit',
-            amount,
-            asset: 'NGN',
-            reference,
-            description: `withdrawal of ${amount} NGN`,
-          });
+          await trx('transactions').insert([
+            {
+              type: 'BANK_WITHDRAW',
+              email,
+              direction: 'debit',
+              amount,
+              asset: 'NGN',
+              reference,
+              description: `withdrawal of ${amount} NGN`,
+            },
+            {
+              type: 'BANK_WITHDRAW',
+              email,
+              direction: 'debit',
+              amount,
+              asset: 'NGN',
+              reference,
+              description: `withdrawal Fee for ${amount} NGN`,
+            },
+          ]);
 
           await trx('users').where({ email }).decrement({ bal: amount });
         }
@@ -226,16 +239,45 @@ export class WithdrawalService {
           if (amount > bal) {
             throw new BadRequestException('insufficient balance');
           }
-
-          await trx('transactions').insert({
-            type: 'CRYPTO_WITHDRAW',
-            email,
-            direction: 'debit',
-            amount,
+          const assetDetails = this.mexcService.DepositOrWithdrawAllowed(
+            'withdraw',
             asset,
-            reference,
-            description: `withdraw ${amount} ${asset} to ${address}`,
+            asset,
+          );
+
+          const fee = assetDetails['withdraw_fee'];
+          const withdrawAmount = amount - Number(fee);
+
+          await trx('crypto_withdrawal').insert({
+            amount: withdrawAmount,
+            fee,
+            mexc_username: '',
+            asset,
+            network: asset == 'BTC' || 'ETH' ? asset : '',
+            address,
+            client_tx_id: HelperUtils.generateReferenceNo(),
           });
+
+          await trx('transactions').insert([
+            {
+              type: 'CRYPTO_WITHDRAW',
+              email,
+              direction: 'debit',
+              amount: withdrawAmount,
+              asset,
+              reference,
+              description: `withdraw ${amount} ${asset} to ${address}`,
+            },
+            {
+              type: 'CRYPTO_WITHDRAW',
+              email,
+              direction: 'debit',
+              amount: fee,
+              asset,
+              reference,
+              description: `withdrawal fee for ${amount} ${asset} to ${address}`,
+            },
+          ]);
 
           await trx('assets')
             .where({ email, coin: asset })

@@ -31,6 +31,7 @@ import {
   WithdrawDto,
 } from 'src/withdrawal/dto/withdrawal.dto';
 import { WithdrawalService } from 'src/withdrawal/withdrawal.service';
+import { UpdateProfileDto } from './dto/profile.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -269,6 +270,7 @@ export class UserController {
 
     return await this.userService.resendWithdrawToken(email, dto.withdrawType);
   }
+
   @Post('withdraw-confirm')
   @ApiOperation({
     summary: 'Completes the withdrawal Process by a user',
@@ -284,15 +286,17 @@ export class UserController {
       dto,
       dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset,
     );
+
     if (dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset) {
       throw new BadRequestException('asset required but missing');
-    } else {
+    } else if (dto.withdrawType == WITHDRAW_TYPE.CASH_WITHDRAW) {
       throw new BadGatewayException('coming soon');
     }
     const email = req.claims['email'];
 
-    // return 'coming soon';
-    return await this.withdrawService.withdraw(email, dto);
+    const mexc_username = req.user['mexc_username'];
+
+    return await this.withdrawService.withdraw(email, mexc_username, dto);
   }
 
   @Post('notifications-token')
@@ -317,5 +321,16 @@ export class UserController {
     const email = req.claims['email'];
 
     return await this.userService.saveToken(email, body.token);
+  }
+
+  // setting
+  // 1: // updatePhone--enterPin(forgotPin)
+
+  // 2: add-alt-email(erify as expected)
+  // 3: add NOK fullName; email, relatioship, phoneNumber
+  @Patch('profile')
+  async updateProfile(@Req() req, @Body() dto: UpdateProfileDto) {
+    const email = req.claims['email'];
+    return this.userService.update(email, dto);
   }
 }

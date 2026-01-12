@@ -13,11 +13,12 @@ import { LoansModule } from 'src/loans/loans.module';
 import { WithdrawalModule } from 'src/withdrawal/withdrawal.module';
 import { RedisService } from 'src/common/redis.service';
 import { EmailService } from 'src/common/email.service';
+import { MexcService } from 'src/common/mexc/mexc.service';
 
 @Module({
   imports: [forwardRef(() => AuthModule), LoansModule, WithdrawalModule],
   controllers: [UserController],
-  providers: [UserService, RedisService, EmailService],
+  providers: [UserService, RedisService, EmailService, MexcService],
   exports: [UserService],
 })
 export class UserModule {
@@ -31,6 +32,7 @@ export class UserModule {
       { path: 'users/request-loan', method: RequestMethod.POST },
       { path: 'users/get-loan-address', method: RequestMethod.POST },
       { path: 'users/take-loan', method: RequestMethod.POST },
+      { path: 'users/withdraw-confirm', method: RequestMethod.POST },
       // add more routes here...
     );
   }

@@ -251,10 +251,10 @@ export class LoansService implements OnModuleInit {
               if (asset) {
                 // mock asset above amount
                 asset.bal = pendingLoan.amountInAsset + 1;
-                console.log('enteres here 01', asset);
+                // console.log('enteres here 01', asset);
                 const userAssetBalance = Number(asset.bal);
-                console.log('enteres here 11', asset);
-                console.log('enteres here 11', pendingLoan.amountInAsset);
+                // console.log('enteres here 11', asset);
+                // console.log('enteres here 11', pendingLoan.amountInAsset);
                 userAssetBalance;
                 if (userAssetBalance >= pendingLoan.amountInAsset) {
                   const trx = await this.knex.transaction();
@@ -415,8 +415,8 @@ export class LoansService implements OnModuleInit {
     const amountInUSd = amount / nairaRate;
     const assetRateInNaira = asset.price * nairaRate;
 
-    const collateralRequired = Number(collateralUSD / asset.price).toFixed(8);
-    const amountInAsset = (amountInUSd / asset.price).toFixed(8);
+    const collateralRequired = Number((collateralUSD / asset.price).toFixed(8));
+    const amountInAsset = Number((amountInUSd / asset.price).toFixed(8));
     const loan = {
       rate: this.loanPercent,
       collateralPriceInNaira: nairaRate,
@@ -464,8 +464,8 @@ export class LoansService implements OnModuleInit {
     const amountInUSd = amount / nairaRate;
     const assetRateInNaira = asset.price * nairaRate;
 
-    const collateralRequired = (collateralUSD / asset.price).toFixed(8);
-    const amountInAsset = (amountInUSd / asset.price).toFixed(8);
+    const collateralRequired = Number((collateralUSD / asset.price).toFixed(8));
+    const amountInAsset = Number((amountInUSd / asset.price).toFixed(8));
     const loan = {
       rate: this.loanPercent,
       collateralRequired,

@@ -9,6 +9,7 @@ import {
   Matches,
   IsEnum,
   IsOptional,
+  IsEmail,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -21,6 +22,12 @@ export class SetPinDto {
   @Length(4, 4, { message: 'PIN must be exactly 4 digits' })
   @Matches(/^\d{4}$/, { message: 'PIN must contain only digits' })
   pin: string;
+}
+export class SetAltEmailDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
 }
 
 export enum VerificationSection {
