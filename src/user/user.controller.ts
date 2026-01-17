@@ -374,6 +374,21 @@ export class UserController {
     return await this.userService.getbanks();
   }
 
+  @Get('info')
+  @ApiOperation({ summary: 'get updated userInfo' })
+  @ApiResponse({
+    schema: {
+      example: {
+        success: 'true',
+        data: {},
+      },
+    },
+  })
+  async getInfo(@Req() req) {
+    const email = req.claims['email'];
+
+    return await this.userService.getInfo(email);
+  }
   @Patch('add_bank')
   @ApiOperation({ summary: 'adds a supported bank account' })
   @ApiResponse({

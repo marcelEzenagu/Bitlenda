@@ -707,4 +707,33 @@ export class UserService {
       throw error;
     }
   }
+
+  async getInfo(email: string) {
+    try {
+      const user = await this.findOne({
+        email,
+      });
+
+      user.password_hash = undefined;
+      user.pin_hash = undefined;
+      user.bvn = undefined;
+      user.token_version = undefined;
+      const bankAccounts = await this.knex('bank_accounts')
+        .where('email', user.email)
+        .select(
+          'bank_name',
+          'bank_code',
+          'account_number',
+          'account_name',
+          'id',
+        );
+
+      user.bank_accounts = bankAccounts;
+
+      return { data: user, success: 'true' };
+    } catch (e) {
+      console.log('ERR== ', e.message);
+      throw new BadRequestException(e);
+    }
+  }
 }

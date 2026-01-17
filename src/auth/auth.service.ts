@@ -63,7 +63,9 @@ export class AuthService {
       if (!isMatch) throw new UnauthorizedException('Incorrect password');
 
       user.password_hash = undefined;
+      user.pin_hash = undefined;
       user.bvn = undefined;
+      user.token_version = undefined;
 
       return user;
     } catch (e) {
