@@ -138,4 +138,13 @@ export interface User {
   role: RoleName;
   last_login: Date;
   withdraw_coin: number;
+  bank_accounts: BankAccount[];
+}
+
+export interface BankAccount {
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  id: number;
+  bank_code: string;
 }

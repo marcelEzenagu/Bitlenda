@@ -113,6 +113,18 @@ export class AuthService {
         };
       }
 
+      const bankAccounts = await this.knex('bank_accounts')
+        .where('email', user.email)
+        .select(
+          'bank_name',
+          'bank_code',
+          'account_number',
+          'account_name',
+          'id',
+        );
+
+      user.bank_accounts = bankAccounts;
+
       const tokenPayload = {
         userID: user.id,
         email: user.email,

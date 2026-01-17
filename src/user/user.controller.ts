@@ -21,7 +21,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { VerificationDto } from './dto/update-user.dto';
+import {
+  AddBankAccountDto,
+  RemoveBankAccountDto,
+  VerificationDto,
+} from './dto/update-user.dto';
 import { TakeLoanDto } from 'src/loans/dto/loan.dto';
 import { Loan } from 'src/loans/entity/loan.entity';
 import { LoansService } from 'src/loans/loans.service';
@@ -222,17 +226,6 @@ export class UserController {
     );
   }
 
-  // add-bank
-  @Patch('add-bank')
-  async addbank() {
-    return 'coming soon';
-  }
-  // verify-bank
-  @Get('verify-bank')
-  async verifybank() {
-    return 'coming soon';
-  }
-
   // withdraw
   @Post('withdraw-init')
   @ApiResponse({
@@ -356,5 +349,60 @@ export class UserController {
   async listAssets(@Req() req) {
     const email = req.claims['email'];
     return await this.userService.listAssetWallet(email);
+  }
+
+  @Get('banks')
+  @ApiOperation({ summary: 'lists all supported banks' })
+  @ApiResponse({
+    schema: {
+      example: {
+        success: 'true',
+        data: [
+          {
+            bankCode: 'dyy10000001',
+            bankName: '3line Card management Limite',
+          },
+          {
+            bankCode: '090270',
+            bankName: 'AB MICROFINANCE BANK',
+          },
+        ],
+      },
+    },
+  })
+  async findAll() {
+    return await this.userService.getbanks();
+  }
+
+  @Patch('add_bank')
+  @ApiOperation({ summary: 'adds a supported bank account' })
+  @ApiResponse({
+    schema: {
+      example: {
+        success: 'true',
+        message: 'account successfully added',
+      },
+    },
+  })
+  async addBank(@Req() req, @Body() dto: AddBankAccountDto) {
+    const email = req.claims['email'];
+
+    return await this.userService.addBankAccount(email, dto);
+  }
+
+  @Delete('remove_bank')
+  @ApiResponse({
+    schema: {
+      example: {
+        success: 'true',
+        message: 'Bank account deleted',
+      },
+    },
+  })
+  @ApiOperation({ summary: 'removes/deletes a supported bank account' })
+  async removeBank(@Req() req, @Body() dto: RemoveBankAccountDto) {
+    const email = req.claims['email'];
+
+    return await this.userService.deleteBankAccount(email, dto.accountId);
   }
 }

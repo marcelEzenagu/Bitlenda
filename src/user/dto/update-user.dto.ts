@@ -93,3 +93,45 @@ export class VerificationDto {
   @IsEnum(VerificationSection)
   section: VerificationSection;
 }
+
+// import { ApiProperty } from '@nestjs/swagger';
+// import { IsNotEmpty, IsString, Length } from 'class-validator';
+
+export class AddBankAccountDto {
+  // @ApiProperty({ example: 'marcelo@example.com' })
+  // @IsNotEmpty()
+  // @IsString()
+  // email: string;
+
+  // @ApiProperty({ example: 'GTBank' })
+  // @IsNotEmpty()
+  // @IsString()
+  // bank_name: string;
+
+  @ApiProperty({ example: '058' })
+  @IsNotEmpty()
+  @IsString()
+  bankCode: string;
+
+  @ApiProperty({ example: '0125678944' })
+  @IsNotEmpty()
+  @IsString()
+  @Length(10, 10, { message: 'Account number must be 10 digits' })
+  accountNumber: string;
+}
+export class RemoveBankAccountDto {
+  // @ApiProperty({ example: 'marcelo@example.com' })
+  // @IsNotEmpty()
+  // @IsString()
+  // email: string;
+
+  // @ApiProperty({ example: 'GTBank' })
+  // @IsNotEmpty()
+  // @IsString()
+  // bank_name: string;
+
+  @ApiProperty({ example: '058' })
+  @IsNotEmpty()
+  @IsString()
+  accountId: string;
+}

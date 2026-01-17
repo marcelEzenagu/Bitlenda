@@ -5,6 +5,7 @@ import {
   forwardRef,
   HttpCode,
   HttpStatus,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { Knex } from 'knex';
@@ -16,6 +17,7 @@ import { HelperUtils } from 'src/common/helpers/helpers';
 
 import { CreateAccountDto } from 'src/auth/dto/create-auth.dto';
 import {
+  AddBankAccountDto,
   SetPinDto,
   VerificationDto,
   VerificationSection,
@@ -26,6 +28,9 @@ import { WITHDRAW_TYPE, WithdrawDto } from 'src/withdrawal/dto/withdrawal.dto';
 import { EmailService } from 'src/common/email.service';
 import { MexcService } from 'src/common/mexc/mexc.service';
 import { ProfileSection, UpdateProfileDto } from './dto/profile.dto';
+import { PalmPayService } from 'src/common/helpers/palmpay';
+import axios from 'axios';
+import { error } from 'console';
 
 export interface AssetWallet {
   bal: number;
@@ -33,6 +38,11 @@ export interface AssetWallet {
 }
 @Injectable()
 export class UserService {
+  private readonly palmPayPub: string;
+  private readonly palmPayPriv: string;
+  private readonly appId: string;
+  private readonly timestamp: number;
+
   constructor(
     @Inject(KNEX_CONNECTION) private readonly knex: Knex,
     @Inject(forwardRef(() => AuthService))
@@ -40,7 +50,15 @@ export class UserService {
     private readonly emailService: EmailService,
     private redisService: RedisService,
     private readonly mexcService: MexcService,
-  ) {}
+    private readonly palmpay: PalmPayService,
+  ) {
+    this.palmPayPub =
+      'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCAitTFUh/9W0dYIVn85V5dr/8FZC4cGU/Qn88BVROVcIn3SgUc0ouRo3majPb3Lgu22a6ZCNiCoVx/UG8z1h4D9XnggsEw6enrCrsei1qU+tAyr2BiKwBgRQjPFjEtuHdpbjmgegUxCUu1gTdI/NXCRszanbHwdZ556/CeE/3rlwIDAQAB';
+    this.palmPayPriv =
+      'MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAICK1MVSH/1bR1ghWfzlXl2v/wVkLhwZT9CfzwFVE5VwifdKBRzSi5GjeZqM9vcuC7bZrpkI2IKhXH9QbzPWHgP1eeCCwTDp6esKux6LWpT60DKvYGIrAGBFCM8WMS24d2luOaB6BTEJS7WBN0j81cJGzNqdsfB1nnnr8J4T/euXAgMBAAECgYB7X0RqArGrZNFr98672JWizAmzbfyHgY/Gh6uR9sruEm6IxyVzDW1hogpT2NosUahynilivke30RHLLDMfCHITNFkTmxIMH0uaBfWPM8xRCL4Jq4hJKsvMZhVxvVK8SxKjElawhlswBt5xBcuT/i5GasBvIiNw6Gr7gV7OIJN2CQJBALl/s8FvKkmgQ2AwQzfbx0Q5M89Yx/qfY2vgMJkpVnNrgmcRKhXZFFoQwqPCvRcW4Ij2QTwiqZuF09QDFTXPIWUCQQCxZXxZbxJnKfUV2tZnefLpag7sp5hJuvbGx5oRx22oKzxl5NA3tLVH10xFeZ5Qjf72luKxl3ghdlNiPy/QKedLAkEAknEIXdr+zWUiC5vOVRjCdU+bYUO7jFWsTYuNkjyaLUBgkDFywhDACmJU5qdkVAgRds7BrVHICClck3FjmzlMKQJAMaX7pXQmrGTbySAUPaWtzJH4V1eYkZoYEw4uGqe8EwL2xnXBqLWUvuSM3izpmBYFs7ILBDUmVAcv0yFoGlR//QJACMBGCaNr6e3JmGTo8HJRmPpdOJlJPISLYxHlXhDtUs+UuYzZrnU4SEQUnflmUijTDX4FXxm2TX4gm+6OTUkkHg==';
+    this.appId = 'L39255713352';
+    this.timestamp = new Date().getTime();
+  }
 
   // Hash helper
   private async hashValue(value: string): Promise<string> {
@@ -497,5 +515,196 @@ export class UserService {
       coin: wallet.coin,
       bal: Number(wallet.bal),
     };
+  }
+
+  async resolveBankAccount(accountNumber, bankCode) {
+    try {
+      const requestBody = {
+        businessType: '0',
+        requestTime: this.timestamp,
+        version: '1.1',
+        bankCode: bankCode,
+        bankAccNo: accountNumber,
+        nonceStr: HelperUtils.generateReferenceNo(),
+      };
+
+      // Wrap it in PEM format
+      const privateKeyPEM = `-----BEGIN PRIVATE KEY-----\n${this.palmPayPriv}\n-----END PRIVATE KEY-----`;
+      const signature = this.palmpay.generateSignature(
+        requestBody,
+        privateKeyPEM,
+      );
+
+      const res = await axios.post(
+        `${process.env.PALMPAY_BASE_URL}/api/v2/general/merchant/payout/queryBankAccount
+ `,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.appId}`,
+            CountryCode: 'NG',
+            'Accept-Encoding': 'gzip',
+            Signature: signature,
+          },
+        },
+      );
+
+      const { data } = res.data;
+      return { data, success: 'true' };
+    } catch (e) {
+      console.log('ERROR', e);
+
+      return 'failed';
+    }
+  }
+
+  async getbanks() {
+    try {
+      const requestBody = {
+        businessType: '0',
+        requestTime: this.timestamp,
+        version: '1.1',
+        nonceStr: HelperUtils.generateReferenceNo(),
+      };
+      // Wrap it in PEM format
+      const privateKeyPEM = `-----BEGIN PRIVATE KEY-----\n${this.palmPayPriv}\n-----END PRIVATE KEY-----`;
+      const signature = this.palmpay.generateSignature(
+        requestBody,
+        privateKeyPEM,
+      );
+
+      console.log(
+        'process.env.PALMPAY_BASE_URL:: ',
+        process.env.PALMPAY_BASE_URL,
+      );
+      const res = await axios.post(
+        `${process.env.PALMPAY_BASE_URL}/api/v2/general/merchant/queryBankList
+ `,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.appId}`,
+            CountryCode: 'NG',
+            'Accept-Encoding': 'gzip',
+            Signature: signature,
+          },
+        },
+      );
+      const { data } = res.data;
+      return {
+        data: data.map(({ bankCode, bankName }) => {
+          return {
+            bankCode,
+            bankName,
+          };
+        }),
+        success: 'true',
+      };
+    } catch (e) {
+      console.log('ERROR', e);
+    }
+  }
+
+  async addBankAccount(email, dto: AddBankAccountDto) {
+    try {
+      let user = await this.knex('users').where('email', email).first();
+      console.log('USER:  ', user);
+      if (!user.first_name || !user.last_name) {
+        throw new UnprocessableEntityException(
+          'missing basic-info,complete basic-info verification',
+        );
+      }
+      const { accountNumber, bankCode } = dto;
+      let fName = user.first_name.toLowerCase().trim();
+      let lName = user.last_name.toLowerCase().trim();
+
+      // check if bank is supported
+      // let accountResolveResponse = await this.resolveBankAccount(
+      //   accountNumber,
+      //   bankCode,
+      // );
+
+      // if (accountResolveResponse === 'failed') {
+      //   throw new Error('Invalid account nuumber');
+      // }
+
+      // console.log('accountResolveResponse:: ', accountResolveResponse);
+      // let accountName = accountResolveResponse.name.toLowerCase().trim();
+      // console.log(accountName);
+      const { data: bankList } = await this.getbanks();
+      // console.log('bankList:: ', bankList);
+
+      const bank = bankList.find((b) => b.bankCode === bankCode);
+
+      if (!bank) {
+        throw new BadRequestException(
+          `Bank with bankCode ${bankCode} not found`,
+        );
+      }
+      console.log('bank:: ', bank);
+      // // check name match
+      // if (accountName.indexOf(lName) > -1 || accountName.indexOf(fName) > -1) {
+      let _bankAccount = await this.knex('bank_accounts')
+        .where('account_number', accountNumber)
+        .first();
+
+      if (_bankAccount === undefined) {
+        // add bank accoount
+        await this.knex('bank_accounts').insert({
+          email: user.email,
+          bank_name: bank.bankName,
+          bank_code: bank.bankCode,
+          account_number: accountNumber,
+          // remove laterOns
+          account_name: `${user.first_name} ${user.last_name} `,
+        });
+
+        return { success: 'true', message: 'Bank account successfully added' };
+      } else if (
+        _bankAccount.deleted_at !== null &&
+        _bankAccount.email === user.email
+      ) {
+        await this.knex('bank_accounts')
+          .update({
+            deleted_at: null,
+          })
+          .where('id', _bankAccount.id);
+        return {
+          success: 'true',
+          message: 'account successfully added',
+        };
+      } else
+        throw new BadRequestException(
+          'Bank account already exist. add new one',
+        );
+      // } else
+      //   throw new error(
+      //     'Account number you provided does not match your name.',
+      //   );
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  }
+
+  async deleteBankAccount(email, bankAccountId) {
+    try {
+      let bankAccount = await this.knex('bank_accounts')
+        .where('id', bankAccountId)
+        .where('email', email)
+        .first();
+      if (bankAccount !== undefined) {
+        await this.knex('bank_accounts').where('id', bankAccountId).update({
+          deleted_at: HelperUtils.getNow(),
+        });
+
+        return { success: 'true', message: 'Bank account deleted' };
+      } else throw new error('Bank account not found');
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
   }
 }

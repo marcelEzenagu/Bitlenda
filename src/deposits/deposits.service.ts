@@ -10,12 +10,53 @@ import { MexcService } from 'src/common/mexc/mexc.service';
 import { Knex } from 'knex';
 import { KNEX_CONNECTION } from 'src/database/knex.config';
 import * as moment from 'moment';
+import * as crypto from 'crypto';
+import axios from 'axios';
+import { HelperUtils } from 'src/common/helpers/helpers';
+import { PalmPayService } from 'src/common/helpers/palmpay';
+
 @Injectable()
 export class DepositsService {
+  private readonly palmPayPub: string;
+  private readonly palmPayPriv: string;
+  private readonly appId: string;
+  private readonly timestamp: number;
+
   constructor(
     private readonly mexcService: MexcService,
+    private readonly palmpay: PalmPayService,
     @Inject(KNEX_CONNECTION) private readonly knex: Knex,
-  ) {}
+  ) {
+    this.palmPayPub =
+      'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCAitTFUh/9W0dYIVn85V5dr/8FZC4cGU/Qn88BVROVcIn3SgUc0ouRo3majPb3Lgu22a6ZCNiCoVx/UG8z1h4D9XnggsEw6enrCrsei1qU+tAyr2BiKwBgRQjPFjEtuHdpbjmgegUxCUu1gTdI/NXCRszanbHwdZ556/CeE/3rlwIDAQAB';
+    this.palmPayPriv =
+      'MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAICK1MVSH/1bR1ghWfzlXl2v/wVkLhwZT9CfzwFVE5VwifdKBRzSi5GjeZqM9vcuC7bZrpkI2IKhXH9QbzPWHgP1eeCCwTDp6esKux6LWpT60DKvYGIrAGBFCM8WMS24d2luOaB6BTEJS7WBN0j81cJGzNqdsfB1nnnr8J4T/euXAgMBAAECgYB7X0RqArGrZNFr98672JWizAmzbfyHgY/Gh6uR9sruEm6IxyVzDW1hogpT2NosUahynilivke30RHLLDMfCHITNFkTmxIMH0uaBfWPM8xRCL4Jq4hJKsvMZhVxvVK8SxKjElawhlswBt5xBcuT/i5GasBvIiNw6Gr7gV7OIJN2CQJBALl/s8FvKkmgQ2AwQzfbx0Q5M89Yx/qfY2vgMJkpVnNrgmcRKhXZFFoQwqPCvRcW4Ij2QTwiqZuF09QDFTXPIWUCQQCxZXxZbxJnKfUV2tZnefLpag7sp5hJuvbGx5oRx22oKzxl5NA3tLVH10xFeZ5Qjf72luKxl3ghdlNiPy/QKedLAkEAknEIXdr+zWUiC5vOVRjCdU+bYUO7jFWsTYuNkjyaLUBgkDFywhDACmJU5qdkVAgRds7BrVHICClck3FjmzlMKQJAMaX7pXQmrGTbySAUPaWtzJH4V1eYkZoYEw4uGqe8EwL2xnXBqLWUvuSM3izpmBYFs7ILBDUmVAcv0yFoGlR//QJACMBGCaNr6e3JmGTo8HJRmPpdOJlJPISLYxHlXhDtUs+UuYzZrnU4SEQUnflmUijTDX4FXxm2TX4gm+6OTUkkHg==';
+    this.appId = 'L39255713352';
+    this.timestamp = new Date().getTime();
+  }
+
+  // sign() {
+  //   const timestamp = new Date().getTime().toString();
+
+  //   const nonce = HelperUtils.generateReferenceNo();
+  //   const timeParams = `requestTime=${timestamp}`;
+
+  //   const signData = `nonceStr=${nonce}&${timeParams}&businessType=0`;
+  //   // const sign = crypto
+  //   //   .createHmac('sha256', secret)
+  //   //   .update(timeParams)
+  //   //   .digest('hex')
+  //   //   .toLowerCase();
+  //   const md5Str = crypto.createHash('md5').update(signData).digest('hex');
+  //   const sign = crypto.sign('RSA-SHA1', md5Str, {
+  //     key: this.palmPayPriv,
+  //     // padding: crypto.constants.RSA_PKCS1_PADDING,
+  //   });
+
+  //   console.log('SIGN:: ', sign);
+  //   return sign.toString();
+  // }
+
   create(createDepositDto: CreateDepositDto) {
     return 'This action adds a new deposit';
   }
@@ -224,5 +265,45 @@ export class DepositsService {
 
     console.log('Done.');
     process.exit(0);
+  }
+
+  async getbanks() {
+    try {
+      const requestBody = {
+        businessType: '0',
+        requestTime: this.timestamp,
+        version: '1.1',
+        nonceStr: HelperUtils.generateReferenceNo(),
+      };
+      // Wrap it in PEM format
+      const privateKeyPEM = `-----BEGIN PRIVATE KEY-----\n${this.palmPayPriv}\n-----END PRIVATE KEY-----`;
+      const signature = this.palmpay.generateSignature(
+        requestBody,
+        privateKeyPEM,
+      );
+
+      console.log(
+        'process.env.PALMPAY_BASE_URL:: ',
+        process.env.PALMPAY_BASE_URL,
+      );
+      const res = await axios.post(
+        `${process.env.PALMPAY_BASE_URL}/api/v2/general/merchant/queryBankList
+ `,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.appId}`,
+            CountryCode: 'NG',
+            'Accept-Encoding': 'gzip',
+            Signature: signature,
+          },
+        },
+      );
+      const { data } = res.data;
+      return { data, success: 'true' };
+    } catch (e) {
+      console.log('ERROR', e);
+    }
   }
 }

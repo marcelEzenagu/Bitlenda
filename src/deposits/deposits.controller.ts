@@ -20,11 +20,6 @@ export class DepositsController {
   //   return this.depositsService.create(createDepositDto);
   // }
 
-  // @Get()
-  // findAll() {
-  //   return this.depositsService.findAll();
-  // }
-
   // @Get(':id')
   // findOne(@Param('id') id: string) {
   //   return this.depositsService.findOne(+id);

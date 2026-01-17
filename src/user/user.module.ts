@@ -14,11 +14,18 @@ import { WithdrawalModule } from 'src/withdrawal/withdrawal.module';
 import { RedisService } from 'src/common/redis.service';
 import { EmailService } from 'src/common/email.service';
 import { MexcService } from 'src/common/mexc/mexc.service';
+import { PalmPayService } from 'src/common/helpers/palmpay';
 
 @Module({
   imports: [forwardRef(() => AuthModule), LoansModule, WithdrawalModule],
   controllers: [UserController],
-  providers: [UserService, RedisService, EmailService, MexcService],
+  providers: [
+    UserService,
+    RedisService,
+    EmailService,
+    MexcService,
+    PalmPayService,
+  ],
   exports: [UserService],
 })
 export class UserModule {
