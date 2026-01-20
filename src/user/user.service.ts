@@ -472,13 +472,13 @@ export class UserService {
   async update(email, dto: UpdateProfileDto) {
     switch (dto.section) {
       case ProfileSection.PHONE:
-        return this.updatePhone(email, dto.phone!);
+        return await this.updatePhone(email, dto.phone!);
 
       case ProfileSection.EMAIL:
-        return this.updateEmail(email, dto.email!);
+        return await this.updateEmail(email, dto.email!);
 
       case ProfileSection.NOK:
-        return this.addOrUpdateNok(email, dto.nok!);
+        return await this.addOrUpdateNok(email, dto.nok!);
 
       default:
         throw new BadRequestException('Invalid profile section');
@@ -492,22 +492,28 @@ export class UserService {
   }
 
   async addOrUpdateNok(email: string, nok) {
-    const existing = await this.knex('nok')
-      .where({ user_email: email })
-      .first();
+    try {
+      const existing = await this.knex('next_of_kins')
+        .where({ user_email: email })
+        .first();
 
-    if (existing) {
-      return this.knex('nok').where({ user_email: email }).update(nok);
+      if (existing) {
+        return await this.knex('next_of_kins')
+          .where({ user_email: email })
+          .update(nok);
+      }
+
+      return await this.knex('next_of_kins').insert({
+        user_email: email,
+        ...nok,
+      });
+    } catch (e) {
+      console.log('EROR: ', e);
     }
-
-    return this.knex('nok').insert({
-      user_email: email,
-      ...nok,
-    });
   }
 
   async updatePhone(email: string, phone: string) {
-    return this.knex('users').where({ email }).update({ phone });
+    return await this.knex('users').where({ email }).update({ phone });
   }
 
   normalizeWallet(wallet: any): AssetWallet {

@@ -35,7 +35,7 @@ import {
   WithdrawDto,
 } from 'src/withdrawal/dto/withdrawal.dto';
 import { WithdrawalService } from 'src/withdrawal/withdrawal.service';
-import { UpdateProfileDto } from './dto/profile.dto';
+import { ProfileSection, UpdateProfileDto } from './dto/profile.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -324,6 +324,9 @@ export class UserController {
   @Patch('profile')
   async updateProfile(@Req() req, @Body() dto: UpdateProfileDto) {
     const email = req.claims['email'];
+    if (dto.section == ProfileSection.NOK && dto.nok == undefined) {
+      throw new BadRequestException('nok required but empty');
+    }
     return await this.userService.update(email, dto);
   }
 

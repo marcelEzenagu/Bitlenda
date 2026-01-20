@@ -4,6 +4,7 @@ import { MexcService } from 'src/common/mexc/mexc.service';
 import { Knex } from 'knex';
 import { KNEX_CONNECTION } from 'src/database/knex.config';
 import { RedisService } from 'src/common/redis.service';
+import { LoanStatus } from './entity/loan.entity';
 
 // import { generateShortId } from 'src/utils/generateId';
 @Injectable()
@@ -241,7 +242,7 @@ export class LoansService implements OnModuleInit {
             const pendingLoan = JSON.parse(pendingLoanStr);
 
             // get assetBalance for the loanAsset
-            const { coin, amount, collateralAmount, repayment_amount } =
+            const { coin, amount, collateralRequired, repayment_amount } =
               pendingLoan;
             if (pendingLoan.coin.toUpperCase() == coin.toUpperCase()) {
               // compare with pendingLoans with assetBalance;
@@ -250,6 +251,7 @@ export class LoansService implements OnModuleInit {
                 .first();
               if (asset) {
                 // mock asset above amount
+
                 asset.bal = pendingLoan.amountInAsset + 1;
                 // console.log('enteres here 01', asset);
                 const userAssetBalance = Number(asset.bal);
@@ -264,11 +266,11 @@ export class LoansService implements OnModuleInit {
                       requested_amount: amount,
                       repayment_amount,
                       balance: repayment_amount,
-                      collateral_amount: collateralAmount,
+                      collateral_amount: collateralRequired,
                       collateral_asset: coin,
                       rate: this.loanPercent,
                       deposit_txid: txId,
-                      status: 'APPROVED',
+                      status: LoanStatus.APPROVED,
                     });
 
                     // lock bal for update
@@ -475,6 +477,8 @@ export class LoansService implements OnModuleInit {
       collateralPercent: this.collateralPercent,
       amountInAsset,
       assetRateInNaira,
+      assetRate: asset.price,
+      coin: cryptoType,
     };
 
     return {

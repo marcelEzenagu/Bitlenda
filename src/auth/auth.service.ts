@@ -65,7 +65,6 @@ export class AuthService {
       user.password_hash = undefined;
       user.pin_hash = undefined;
       user.bvn = undefined;
-      user.token_version = undefined;
 
       return user;
     } catch (e) {
@@ -126,7 +125,6 @@ export class AuthService {
         );
 
       user.bank_accounts = bankAccounts;
-
       const tokenPayload = {
         userID: user.id,
         email: user.email,

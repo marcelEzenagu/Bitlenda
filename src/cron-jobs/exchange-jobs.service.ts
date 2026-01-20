@@ -39,4 +39,6 @@ export class ExchangeJobService implements OnApplicationBootstrap {
   async loadCountryCron() {
     await this.exchangeService.handleLoadCountry();
   }
+
+  // handle crypto-asset price changes
 }
