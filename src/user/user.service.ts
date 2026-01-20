@@ -18,13 +18,18 @@ import { HelperUtils } from 'src/common/helpers/helpers';
 import { CreateAccountDto } from 'src/auth/dto/create-auth.dto';
 import {
   AddBankAccountDto,
+  BankWithdrawalDto,
   SetPinDto,
   VerificationDto,
   VerificationSection,
 } from './dto/update-user.dto';
 import { AuthService } from 'src/auth/auth.service';
 import { RedisService } from 'src/common/redis.service';
-import { WITHDRAW_TYPE, WithdrawDto } from 'src/withdrawal/dto/withdrawal.dto';
+import {
+  InitWithdrawDto,
+  WITHDRAW_TYPE,
+  WithdrawDto,
+} from 'src/withdrawal/dto/withdrawal.dto';
 import { EmailService } from 'src/common/email.service';
 import { MexcService } from 'src/common/mexc/mexc.service';
 import { ProfileSection, UpdateProfileDto } from './dto/profile.dto';
@@ -386,7 +391,7 @@ export class UserService {
     }
   }
 
-  async initWithdraw(email: string, dto: WithdrawDto) {
+  async initWithdraw(email: string, dto: InitWithdrawDto) {
     const { amount, withdrawType, asset, address } = dto;
 
     // soft balance check (UX only)
@@ -396,6 +401,7 @@ export class UserService {
         .where({ email })
         .first();
 
+      console.log('row.bal:: ', row.bal);
       if (!row || amount > row.bal) {
         throw new BadRequestException('insufficient balance');
       }
@@ -406,19 +412,19 @@ export class UserService {
 
     if (withdrawType === WITHDRAW_TYPE.CRYPTO_WITHDRAW) {
       const row = await this.knex('assets')
-        .select('bal')
         .where({ email, coin: asset })
         .first();
+      console.log('row.bal==:: ', row);
 
       if (!row || amount > row.bal) {
         throw new BadRequestException('insufficient balance');
       }
 
-      if (row.withdraw_coin != 0) {
-        throw new BadRequestException(
-          'you cannot make a withdraw, as you have uncleared loan',
-        );
-      }
+      // if (row.withdraw_coin != 0) {
+      //   throw new BadRequestException(
+      //     'you cannot make a withdraw, as you have uncleared loan',
+      //   );
+      // }
     }
 
     const token = this.authService.generateOtp();
@@ -621,6 +627,105 @@ export class UserService {
     }
   }
 
+  async queryTransaction() {
+    try {
+      const requestBody = {
+        businessType: '0',
+        requestTime: this.timestamp,
+        version: '1.1',
+        nonceStr: HelperUtils.generateReferenceNo(),
+      };
+      // Wrap it in PEM format
+      const privateKeyPEM = `-----BEGIN PRIVATE KEY-----\n${this.palmPayPriv}\n-----END PRIVATE KEY-----`;
+      const signature = this.palmpay.generateSignature(
+        requestBody,
+        privateKeyPEM,
+      );
+
+      console.log(
+        'process.env.PALMPAY_BASE_URL:: ',
+        process.env.PALMPAY_BASE_URL,
+      );
+      const res = await axios.post(
+        `${process.env.PALMPAY_BASE_URL}/api/v2/general/merchant/queryBankList
+ `,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.appId}`,
+            CountryCode: 'NG',
+            'Accept-Encoding': 'gzip',
+            Signature: signature,
+          },
+        },
+      );
+      const { data } = res.data;
+      return {
+        data: data.map(({ bankCode, bankName }) => {
+          return {
+            bankCode,
+            bankName,
+          };
+        }),
+        success: 'true',
+      };
+    } catch (e) {
+      console.log('ERROR', e);
+    }
+  }
+
+  async initPalmpayWithdrawal(dto) {
+    const { accountNumber, amount, bankCode, reference } = dto;
+
+    dto.amount = amount * 100;
+
+    console.log('AMOUNT ', amount);
+    console.log('AMOUNT ', dto.amount);
+    try {
+      const requestBody = {
+        orderId: reference,
+        payeeBankAccNo: accountNumber,
+        payeeBankCode: bankCode,
+        amount,
+        currency: 'NGN',
+        notifyUrl: 'https://webhook.site/6eaa6fb5-b0b4-452c-8d09-6ef071c3e4fc',
+        businessType: '0',
+        requestTime: this.timestamp,
+        version: '1.1',
+        nonceStr: reference,
+      };
+      // Wrap it in PEM format
+      const privateKeyPEM = `-----BEGIN PRIVATE KEY-----\n${this.palmPayPriv}\n-----END PRIVATE KEY-----`;
+      const signature = this.palmpay.generateSignature(
+        requestBody,
+        privateKeyPEM,
+      );
+
+      console.log(
+        'process.env.PALMPAY_BASE_URL:: ',
+        process.env.PALMPAY_BASE_URL,
+      );
+      const res = await axios.post(
+        `${process.env.PALMPAY_BASE_URL}/api/v2/merchant/payment/payout`,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.appId}`,
+            CountryCode: 'NG',
+            'Accept-Encoding': 'gzip',
+            Signature: signature,
+          },
+        },
+      );
+      const { data } = res.data;
+      return data;
+    } catch (e) {
+      console.log('ERROR', e);
+    }
+  }
+
   async addBankAccount(email, dto: AddBankAccountDto) {
     try {
       let user = await this.knex('users').where('email', email).first();
@@ -697,6 +802,88 @@ export class UserService {
       //   throw new error(
       //     'Account number you provided does not match your name.',
       //   );
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  }
+
+  async initBankWithdrawal(email, dto: BankWithdrawalDto) {
+    const { amount, accountId } = dto;
+    try {
+      let bankAccount = await this.knex('bank_accounts')
+        .select(
+          'id',
+          'account_name',
+          'account_number',
+          'bank_name',
+          'bank_code',
+        )
+        .whereNull('deleted_at')
+        .where('id', accountId)
+        .where('email', email)
+        .first();
+      if (bankAccount !== undefined) {
+        const { account_number, bank_name, bank_code } = bankAccount;
+        const trx = await this.knex.transaction();
+        try {
+          // get user available bal
+          const availableBalRes = await trx.raw(
+            'SELECT bal FROM users WHERE email=? FOR UPDATE',
+            [email],
+          );
+
+          // if balance response is valid
+          if (availableBalRes !== undefined && availableBalRes[0][0]) {
+            const availableBal = availableBalRes[0][0]['bal'];
+
+            //fee
+            let withdrawalFee;
+            if (amount < 10000) {
+              withdrawalFee = 50;
+            } else if (amount >= 10000 && amount < 100000) {
+              withdrawalFee = 100;
+            } else if (amount >= 100000 && amount < 500000) {
+              withdrawalFee = 150;
+            } else {
+              withdrawalFee = 250;
+            }
+
+            if (availableBal >= amount + withdrawalFee) {
+              const token = this.authService.generateOtp();
+              const tokenHash = HelperUtils.hashToken(token);
+
+              const intent = HelperUtils.buildWithdrawIntent({
+                withdrawType: WITHDRAW_TYPE.CASH_WITHDRAW,
+                amount,
+                accountId,
+              });
+
+              // const intentString = JSON.stringify(intent);
+
+              const intentHash = HelperUtils.hashToken(JSON.stringify(intent));
+
+              await this.redisService.setTimedValue(
+                `withdraw:intent:${email}:${WITHDRAW_TYPE.CASH_WITHDRAW}`,
+                JSON.stringify({ tokenHash, intentHash, attempts: 0 }),
+                300,
+              );
+
+              await this.emailService.sendWithdrawalEmail(
+                email,
+                token,
+                WITHDRAW_TYPE.CASH_WITHDRAW,
+              );
+
+              await trx.commit();
+              return { success: 'true', message: 'token sent' };
+            } else throw new BadRequestException(`Insufficient balance.`);
+          } else throw new BadRequestException('Invalid user account');
+        } catch (error) {
+          await trx.rollback();
+          throw error;
+        }
+      } else throw new BadRequestException('Bank account not found');
     } catch (error) {
       console.log(error);
       throw error;

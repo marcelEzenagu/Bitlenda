@@ -13,8 +13,9 @@ export enum WITHDRAW_TYPE {
   CRYPTO_WITHDRAW = 'CRYPTO_WITHDRAW',
   CASH_WITHDRAW = 'CASH_WITHDRAW',
 }
-export class WithdrawDto {
-  @ApiProperty({ example: 1000, description: 'The amount of loan to take' })
+
+export class InitWithdrawDto {
+  @ApiProperty({ example: 1000, description: 'The amount to withdraw' })
   @IsNumber()
   @IsPositive()
   amount: number;
@@ -47,13 +48,19 @@ export class WithdrawDto {
   @IsString()
   address?: string;
 
-  @ApiPropertyOptional({
+  @ApiPropertyOptional({ example: '058' })
+  @IsString()
+  @IsOptional()
+  accountId?: string;
+}
+
+export class WithdrawDto extends InitWithdrawDto {
+  @ApiProperty({
     example: '0544..',
     description: 'The token sent to verify withdrawal',
   })
-  @IsOptional()
   @IsString()
-  token?: string;
+  token: string;
 }
 export class ResendWithdrawTokenDto {
   @ApiProperty({

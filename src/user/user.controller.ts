@@ -23,6 +23,7 @@ import {
 import { UserService } from './user.service';
 import {
   AddBankAccountDto,
+  BankWithdrawalDto,
   RemoveBankAccountDto,
   VerificationDto,
 } from './dto/update-user.dto';
@@ -30,6 +31,7 @@ import { TakeLoanDto } from 'src/loans/dto/loan.dto';
 import { Loan } from 'src/loans/entity/loan.entity';
 import { LoansService } from 'src/loans/loans.service';
 import {
+  InitWithdrawDto,
   ResendWithdrawTokenDto,
   WITHDRAW_TYPE,
   WithdrawDto,
@@ -234,9 +236,7 @@ export class UserController {
   @ApiOperation({
     summary: 'Initiates the withdrawal Process by sending a withdrawal-token',
   })
-  async WithdrawInit(@Body() dto: WithdrawDto, @Req() req) {
-    const userID = req.claims['email'];
-
+  async WithdrawInit(@Body() dto: InitWithdrawDto, @Req() req) {
     console.log(
       'dto.asset',
       dto,
@@ -272,19 +272,16 @@ export class UserController {
     schema: { example: { success: 'true', message: 'withdrawal successful' } },
   })
   async Withdraw(@Body() dto: WithdrawDto, @Req() req) {
-    const userID = req.claims['email'];
+    // console.log(
+    //   'dto.asset',
+    //   dto,
+    //   dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset,
+    // );
 
-    console.log(
-      'dto.asset',
-      dto,
-      dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset,
-    );
+    // if (dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset) {
+    //   throw new BadRequestException('asset required but missing');
+    // }
 
-    if (dto.withdrawType == WITHDRAW_TYPE.CRYPTO_WITHDRAW && !dto.asset) {
-      throw new BadRequestException('asset required but missing');
-    } else if (dto.withdrawType == WITHDRAW_TYPE.CASH_WITHDRAW) {
-      throw new BadGatewayException('coming soon');
-    }
     const email = req.claims['email'];
 
     const mexc_username = req.user['mexc_username'];
@@ -393,6 +390,7 @@ export class UserController {
 
     return await this.userService.getInfo(email);
   }
+
   @Patch('add_bank')
   @ApiOperation({ summary: 'adds a supported bank account' })
   @ApiResponse({
@@ -423,5 +421,21 @@ export class UserController {
     const email = req.claims['email'];
 
     return await this.userService.deleteBankAccount(email, dto.accountId);
+  }
+
+  @Post('bank-withdraws')
+  @ApiResponse({
+    schema: {
+      example: {
+        success: 'true',
+      },
+    },
+  })
+  @ApiOperation({ summary: 'handle bank-withdraws' })
+  async withdrawToBank(@Req() req, @Body() dto: BankWithdrawalDto) {
+    const email = req.claims['email'];
+
+    // return await this.userService.handleBankWithdrawal(email, dto);
+    return await this.userService.initBankWithdrawal(email, dto);
   }
 }

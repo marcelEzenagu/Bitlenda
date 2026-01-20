@@ -159,25 +159,26 @@ export class WithdrawalService {
         dto.asset = undefined;
         dto.address = undefined;
       }
+      if (!token) {
+        throw new BadRequestException('token required');
+      }
       //  validate redis intent
       const cached = await this.redisService.getValue(
         `withdraw:intent:${email}:${withdrawType}`,
       );
 
-      // console.log('cached', cached);
       if (!cached) {
-        throw new BadRequestException('token required or expired');
+        throw new BadRequestException('token expired');
       }
 
       const data = JSON.parse(cached);
-      const intent = HelperUtils.buildWithdrawIntent(dto);
+      const intentDto = { ...dto };
+      intentDto.token = undefined;
+      const intent = HelperUtils.buildWithdrawIntent(intentDto);
 
       const intentString = JSON.stringify(intent);
 
-      // console.log('WITHDRAW intentString:', intentString);
-      console.log('REDIS intentHash:', data.intentHash);
       const intentHash = HelperUtils.hashToken(JSON.stringify(intent));
-      console.log('WITHDRAW intentHash:', intentHash);
 
       if (intentHash !== data.intentHash) {
         throw new BadRequestException('withdrawal details changed');
@@ -188,48 +189,53 @@ export class WithdrawalService {
         throw new BadRequestException('invalid token');
       }
 
-      // 2️⃣ authoritative execution (your logic)
-      const trx = await this.knex.transaction();
+      //  authoritative execution (your logic)
 
       try {
+        let result;
         const reference = HelperUtils.generateReferenceNo();
 
         if (withdrawType === WITHDRAW_TYPE.CASH_WITHDRAW) {
-          const row = await trx.raw(
-            'SELECT bal FROM users WHERE email=? FOR UPDATE',
-            [email],
-          );
+          console.log('GOT HERE');
+          result = await this.handleBankWithdrawal(email, dto);
+          // return;
+          // const row = await trx.raw(
+          //   'SELECT bal FROM users WHERE email=? FOR UPDATE',
+          //   [email],
+          // );
 
-          const bal = row[0][0].bal;
-          if (amount > bal) {
-            throw new BadRequestException('insufficient balance');
-          }
+          // const bal = row[0][0].bal;
+          // if (amount > bal) {
+          //   throw new BadRequestException('insufficient balance');
+          // }
 
-          await trx('transactions').insert([
-            {
-              type: 'BANK_WITHDRAW',
-              email,
-              direction: 'debit',
-              amount,
-              asset: 'NGN',
-              reference,
-              description: `withdrawal of ${amount} NGN`,
-            },
-            {
-              type: 'BANK_WITHDRAW',
-              email,
-              direction: 'debit',
-              amount,
-              asset: 'NGN',
-              reference,
-              description: `withdrawal Fee for ${amount} NGN`,
-            },
-          ]);
+          // await trx('transactions').insert([
+          //   {
+          //     type: 'BANK_WITHDRAW',
+          //     email,
+          //     direction: 'debit',
+          //     amount,
+          //     asset: 'NGN',
+          //     reference,
+          //     description: `withdrawal of ${amount} NGN`,
+          //   },
+          //   {
+          //     type: 'BANK_WITHDRAW',
+          //     email,
+          //     direction: 'debit',
+          //     amount,
+          //     asset: 'NGN',
+          //     reference,
+          //     description: `withdrawal Fee for ${amount} NGN`,
+          //   },
+          // ]);
 
-          await trx('users').where({ email }).decrement({ bal: amount });
+          // await trx('users').where({ email }).decrement({ bal: amount });
         }
 
         if (withdrawType === WITHDRAW_TYPE.CRYPTO_WITHDRAW) {
+          const trx = await this.knex.transaction();
+
           const row = await trx.raw(
             'SELECT bal FROM assets WHERE email=? AND coin=? FOR UPDATE',
             [email, asset],
@@ -250,8 +256,8 @@ export class WithdrawalService {
 
           await trx('crypto_withdrawal').insert({
             amount: withdrawAmount,
-            fee,
-            mexc_username: '',
+            // fee,
+            mexc_username: username,
             asset,
             network: asset == 'BTC' || 'ETH' ? asset : '',
             address,
@@ -282,21 +288,126 @@ export class WithdrawalService {
           await trx('assets')
             .where({ email, coin: asset })
             .decrement({ bal: amount });
+          await trx.commit();
         }
-
-        await trx.commit();
 
         // best-effort cleanup
         this.redisService.remove(`withdraw:intent:${email}`).catch(() => {});
 
-        return { success: 'true', message: 'withdrawal successful' };
+        return result;
       } catch (e) {
-        await trx.rollback();
         throw e;
       }
     } catch (e) {
       console.log('ERROR: ', e);
       throw e;
+    }
+  }
+
+  async handleBankWithdrawal(email, dto: WithdrawDto) {
+    const { amount, accountId } = dto;
+    try {
+      let bankAccount = await this.knex('bank_accounts')
+        .select(
+          'id',
+          'account_name',
+          'account_number',
+          'bank_name',
+          'bank_code',
+        )
+        .whereNull('deleted_at')
+        .where('id', accountId)
+        .where('email', email)
+        .first();
+      if (bankAccount !== undefined) {
+        const { account_number, bank_name, bank_code } = bankAccount;
+        const trx = await this.knex.transaction();
+        try {
+          // get user available bal
+          const availableBalRes = await trx.raw(
+            'SELECT bal FROM users WHERE email=? FOR UPDATE',
+            [email],
+          );
+
+          // if balance response is valid
+          if (availableBalRes !== undefined && availableBalRes[0][0]) {
+            const availableBal = availableBalRes[0][0]['bal'];
+
+            //fee
+            let withdrawalFee;
+            if (amount < 10000) {
+              withdrawalFee = 50;
+            } else if (amount >= 10000 && amount < 100000) {
+              withdrawalFee = 100;
+            } else if (amount >= 100000 && amount < 500000) {
+              withdrawalFee = 150;
+            } else {
+              withdrawalFee = 250;
+            }
+
+            if (availableBal >= amount + withdrawalFee) {
+              const nonceStr = HelperUtils.generateReferenceNo();
+              let trxId = `Bitlenda-${nonceStr}`;
+              // debit user  balance
+              await trx('users')
+                .decrement('bal', amount + withdrawalFee)
+                .where('email', email);
+
+              //  create bank  withdraw record
+              await trx('bank_withdrawal').insert({
+                email,
+                tx_id: trxId,
+                reference: trxId,
+                amount,
+                fee: withdrawalFee,
+                bank_account_id: accountId,
+              });
+
+              // add withdraw transaction
+              await trx('transactions').insert([
+                {
+                  email: email,
+                  type: `BANK_WITHDRAW`,
+                  reference: `${trxId}_fee`,
+                  direction: 'debit',
+                  // slug: 'Bank_withdraw_fee',
+                  asset: 'NGN',
+                  amount: withdrawalFee,
+                  // Bank_bal: availableBal - (amount + withdrawalFee),
+                  description: `Fee for Withdraw of  ${amount.toFixed(2)} NGN to ${
+                    bankAccount.account_name
+                  } (${bankAccount.bank_name})`,
+                },
+                {
+                  email: email,
+                  type: `BANK_WITHDRAW`,
+                  reference: trxId,
+                  direction: 'debit',
+                  // slug: 'bank_withdraw',
+                  asset: 'NGN',
+                  amount,
+                  // Bank_bal: availableBal - amount,
+                  description: ` Withdraw of  ${amount.toFixed(2)} NGN to ${
+                    bankAccount.account_name
+                  } (${bankAccount.bank_name})`,
+                },
+              ]);
+
+              // handle-offer ref
+              console.log('FINSAL');
+              await trx.commit();
+              return { message: 'bank withdrawal successful', success: 'true' };
+            } else throw new BadRequestException(`Insufficient balance.`);
+          } else throw new BadRequestException('Invalid transaction');
+        } catch (error) {
+          console.log('RROR', error);
+          await trx.rollback();
+          throw error;
+        }
+      } else throw new BadRequestException('Bank account not found');
+    } catch (error) {
+      console.log(error);
+      throw error;
     }
   }
 }

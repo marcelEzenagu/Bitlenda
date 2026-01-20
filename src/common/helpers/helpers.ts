@@ -1,5 +1,8 @@
 import * as crypto from 'crypto';
-import { WithdrawDto } from 'src/withdrawal/dto/withdrawal.dto';
+import {
+  InitWithdrawDto,
+  WithdrawDto,
+} from 'src/withdrawal/dto/withdrawal.dto';
 
 export class HelperUtils {
   /**
@@ -43,12 +46,13 @@ export class HelperUtils {
     );
   }
 
-  static buildWithdrawIntent(dto: WithdrawDto) {
+  static buildWithdrawIntent(dto: InitWithdrawDto) {
     return {
       withdrawType: String(dto.withdrawType),
       amount: Number(dto.amount),
       asset: dto.asset ?? '',
       address: dto.address ?? '',
+      accountId: dto.accountId ?? '',
     };
   }
 

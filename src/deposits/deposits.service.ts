@@ -196,6 +196,7 @@ export class DepositsService {
       let { amount, coin, time, sourceAddress, txId, address } = deposit;
       amount = Number(Number(amount).toFixed(8)).toString();
 
+      console.log('AMOUNT: ', amount);
       let description = `You received ${amount} ${coin} from  ${sourceAddress}`;
       const email = user.email;
 
@@ -221,7 +222,7 @@ export class DepositsService {
 
       // credit user asset balance
       await trx('assets')
-        .increment('bal', amount)
+        .increment('bal', 0.003)
         .increment('total_deposited', amount)
         .where({ email, coin });
 

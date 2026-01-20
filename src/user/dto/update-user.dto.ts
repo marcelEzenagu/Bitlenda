@@ -10,6 +10,7 @@ import {
   IsEnum,
   IsOptional,
   IsEmail,
+  Min,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -94,20 +95,7 @@ export class VerificationDto {
   section: VerificationSection;
 }
 
-// import { ApiProperty } from '@nestjs/swagger';
-// import { IsNotEmpty, IsString, Length } from 'class-validator';
-
 export class AddBankAccountDto {
-  // @ApiProperty({ example: 'marcelo@example.com' })
-  // @IsNotEmpty()
-  // @IsString()
-  // email: string;
-
-  // @ApiProperty({ example: 'GTBank' })
-  // @IsNotEmpty()
-  // @IsString()
-  // bank_name: string;
-
   @ApiProperty({ example: '058' })
   @IsNotEmpty()
   @IsString()
@@ -120,15 +108,16 @@ export class AddBankAccountDto {
   accountNumber: string;
 }
 export class RemoveBankAccountDto {
-  // @ApiProperty({ example: 'marcelo@example.com' })
-  // @IsNotEmpty()
-  // @IsString()
-  // email: string;
-
-  // @ApiProperty({ example: 'GTBank' })
-  // @IsNotEmpty()
-  // @IsString()
-  // bank_name: string;
+  @ApiProperty({ example: '058' })
+  @IsNotEmpty()
+  @IsString()
+  accountId: string;
+}
+export class BankWithdrawalDto {
+  @ApiProperty({ example: '1000' })
+  @Min(100)
+  @IsNumber()
+  amount: number;
 
   @ApiProperty({ example: '058' })
   @IsNotEmpty()
