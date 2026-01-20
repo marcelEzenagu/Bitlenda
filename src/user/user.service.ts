@@ -489,6 +489,11 @@ export class UserService {
     await this.knex('users')
       .where({ email: oldEmail })
       .update({ alt_email: newEmail });
+
+    return {
+      message: 'email updated successfully',
+      success: 'true',
+    };
   }
 
   async addOrUpdateNok(email: string, nok) {
@@ -498,22 +503,25 @@ export class UserService {
         .first();
 
       if (existing) {
-        return await this.knex('next_of_kins')
+        await this.knex('next_of_kins')
           .where({ user_email: email })
           .update(nok);
+        return { message: 'next of kin updated successfully', success: 'true' };
       }
 
-      return await this.knex('next_of_kins').insert({
+      await this.knex('next_of_kins').insert({
         user_email: email,
         ...nok,
       });
+      return { message: 'next of kin added successfully', success: 'true' };
     } catch (e) {
       console.log('EROR: ', e);
     }
   }
 
   async updatePhone(email: string, phone: string) {
-    return await this.knex('users').where({ email }).update({ phone });
+    await this.knex('users').where({ email }).update({ phone });
+    return { message: 'phone number updated successfully', success: 'true' };
   }
 
   normalizeWallet(wallet: any): AssetWallet {

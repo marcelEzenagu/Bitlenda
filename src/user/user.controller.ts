@@ -321,6 +321,7 @@ export class UserController {
 
   // 2: add-alt-email(erify as expected)
   // 3: add NOK fullName; email, relatioship, phoneNumber
+  @ApiOperation({ summary: 'updates a user profile ' })
   @Patch('profile')
   async updateProfile(@Req() req, @Body() dto: UpdateProfileDto) {
     const email = req.claims['email'];
