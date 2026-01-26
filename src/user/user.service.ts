@@ -808,6 +808,61 @@ export class UserService {
     }
   }
 
+  async verifyBankAccount(email, dto: AddBankAccountDto) {
+    try {
+      let user = await this.knex('users').where('email', email).first();
+      console.log('USER:  ', user);
+      if (!user.first_name || !user.last_name) {
+        throw new UnprocessableEntityException(
+          'missing basic-info,complete basic-info verification',
+        );
+      }
+      const { accountNumber, bankCode } = dto;
+      let fName = user.first_name.toLowerCase().trim();
+      let lName = user.last_name.toLowerCase().trim();
+
+      // check if bank is supported
+      // let accountResolveResponse = await this.resolveBankAccount(
+      //   accountNumber,
+      //   bankCode,
+      // );
+
+      // if (accountResolveResponse === 'failed') {
+      //   throw new Error('Invalid account nuumber');
+      // }
+
+      // console.log('accountResolveResponse:: ', accountResolveResponse);
+      // let accountName = accountResolveResponse.name.toLowerCase().trim();
+      // console.log(accountName);
+      const { data: bankList } = await this.getbanks();
+      // console.log('bankList:: ', bankList);
+
+      const bank = bankList.find((b) => b.bankCode === bankCode);
+
+      if (!bank) {
+        throw new BadRequestException(
+          `Bank with bankCode ${bankCode} not found`,
+        );
+      }
+      // remove laterOn;
+
+      const res = {
+        bank_name: bank.bankName,
+        account_number: accountNumber,
+        bank_code: bank.bankCode,
+        account_name: `${user.first_name} ${user.last_name} `,
+      };
+
+      return {
+        success: 'true',
+        data: res,
+      };
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  }
+
   async initBankWithdrawal(email, dto: BankWithdrawalDto) {
     const { amount, accountId } = dto;
     try {

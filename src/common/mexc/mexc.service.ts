@@ -549,14 +549,14 @@ export class MexcService {
       // const res = response.filter((x) => x.coin == coin);
       const res = response.find((x) => x.coin == coin);
 
-      console.log('res:', res);
+      // console.log('res:', res);
       // console.log("res.networkList:", res.networkList);
       // console.log("res.networkList.length:", res.networkList.length);
       // console.log("res.networkList:", res.networkList[0]);
       // console.log("res.networkList:", res.networkList[1]);
       // console.log("res.networkList:", res.networkList[2]);
 
-      let assetRes: any;
+      let assetRes: any = {};
       if (res.networkList != 'undefined') {
         const asset = res.networkList.find(
           (x) => x.coin == coin && x.netWork == network,
@@ -570,10 +570,11 @@ export class MexcService {
             assetRes.enabled = asset.depositEnable;
             assetRes.network = asset.network;
           } else if (side.toLowerCase() === 'withdraw') {
-            console.log('ASSET:: ', asset);
-            assetRes.enabled = asset.withdrawEnable;
-            assetRes.withdraw_fee = asset.withdrawFee;
-            assetRes.withdraw_minsize = asset.withdrawMin;
+            console.log('ASSET_withdraw:: ', asset);
+            // assetRes.enabled = asset.withdrawEnable;
+            assetRes.enabled = asset['withdrawEnable'];
+            assetRes.withdraw_fee = asset['withdrawFee'];
+            assetRes.withdraw_minsize = asset['withdrawMin'];
           }
         }
       }

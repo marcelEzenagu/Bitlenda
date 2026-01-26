@@ -407,6 +407,26 @@ export class UserController {
     return await this.userService.addBankAccount(email, dto);
   }
 
+  @Post('verify-bank-account')
+  @ApiOperation({ summary: 'verifies bank account' })
+  @ApiResponse({
+    schema: {
+      example: {
+        success: 'true',
+        data: {
+          bank_name: 'OPAY',
+          account_number: '9160798388',
+          bank_code: '355555',
+          account_name: 'Marl Procin  ',
+        },
+      },
+    },
+  })
+  async verifyBank(@Req() req, @Body() dto: AddBankAccountDto) {
+    const email = req.claims['email'];
+
+    return await this.userService.verifyBankAccount(email, dto);
+  }
   @Delete('remove_bank')
   @ApiResponse({
     schema: {

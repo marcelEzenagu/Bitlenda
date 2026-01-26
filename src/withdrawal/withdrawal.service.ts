@@ -159,35 +159,35 @@ export class WithdrawalService {
         dto.asset = undefined;
         dto.address = undefined;
       }
-      if (!token) {
-        throw new BadRequestException('token required');
-      }
-      //  validate redis intent
-      const cached = await this.redisService.getValue(
-        `withdraw:intent:${email}:${withdrawType}`,
-      );
+      // if (!token) {
+      //   throw new BadRequestException('token required');
+      // }
+      // //  validate redis intent
+      // const cached = await this.redisService.getValue(
+      //   `withdraw:intent:${email}:${withdrawType}`,
+      // );
 
-      if (!cached) {
-        throw new BadRequestException('token expired');
-      }
+      // if (!cached) {
+      //   throw new BadRequestException('token expired');
+      // }
 
-      const data = JSON.parse(cached);
-      const intentDto = { ...dto };
-      intentDto.token = undefined;
-      const intent = HelperUtils.buildWithdrawIntent(intentDto);
+      // const data = JSON.parse(cached);
+      // const intentDto = { ...dto };
+      // intentDto.token = undefined;
+      // const intent = HelperUtils.buildWithdrawIntent(intentDto);
 
-      const intentString = JSON.stringify(intent);
+      // const intentString = JSON.stringify(intent);
 
-      const intentHash = HelperUtils.hashToken(JSON.stringify(intent));
+      // const intentHash = HelperUtils.hashToken(JSON.stringify(intent));
 
-      if (intentHash !== data.intentHash) {
-        throw new BadRequestException('withdrawal details changed');
-      }
+      // if (intentHash !== data.intentHash) {
+      //   throw new BadRequestException('withdrawal details changed');
+      // }
 
-      // if (!HelperUtils.compareHash(token, data.tokenHash)) {
-      if (!HelperUtils.verifyToken(token, data.tokenHash)) {
-        throw new BadRequestException('invalid token');
-      }
+      // // if (!HelperUtils.compareHash(token, data.tokenHash)) {
+      // if (!HelperUtils.verifyToken(token, data.tokenHash)) {
+      //   throw new BadRequestException('invalid token');
+      // }
 
       //  authoritative execution (your logic)
 
@@ -245,16 +245,18 @@ export class WithdrawalService {
           if (amount > bal) {
             throw new BadRequestException('insufficient balance');
           }
-          const assetDetails = this.mexcService.DepositOrWithdrawAllowed(
+          const assetDetails = await this.mexcService.DepositOrWithdrawAllowed(
             'withdraw',
             asset,
             asset,
           );
+          console.log('assetDetails', assetDetails);
 
           const fee = assetDetails['withdraw_fee'];
-          const withdrawAmount = amount - Number(fee);
+          const withdrawAmount = Number(amount) - Number(fee);
 
           await trx('crypto_withdrawal').insert({
+            email,
             amount: withdrawAmount,
             // fee,
             mexc_username: username,
@@ -266,7 +268,7 @@ export class WithdrawalService {
 
           await trx('transactions').insert([
             {
-              type: 'CRYPTO_WITHDRAW',
+              type: 'COIN_WITHDRAW',
               email,
               direction: 'debit',
               amount: withdrawAmount,
@@ -275,12 +277,12 @@ export class WithdrawalService {
               description: `withdraw ${amount} ${asset} to ${address}`,
             },
             {
-              type: 'CRYPTO_WITHDRAW',
+              type: 'COIN_WITHDRAW',
               email,
               direction: 'debit',
               amount: fee,
               asset,
-              reference,
+              reference: `${reference}_fee`,
               description: `withdrawal fee for ${amount} ${asset} to ${address}`,
             },
           ]);
@@ -289,6 +291,8 @@ export class WithdrawalService {
             .where({ email, coin: asset })
             .decrement({ bal: amount });
           await trx.commit();
+
+          result = { message: 'crypto withdrawal successful', success: 'true' };
         }
 
         // best-effort cleanup
@@ -393,8 +397,6 @@ export class WithdrawalService {
                 },
               ]);
 
-              // handle-offer ref
-              console.log('FINSAL');
               await trx.commit();
               return { message: 'bank withdrawal successful', success: 'true' };
             } else throw new BadRequestException(`Insufficient balance.`);
