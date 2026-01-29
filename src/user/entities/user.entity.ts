@@ -134,6 +134,7 @@ export interface User {
   mexc_username?: string;
   token_version?: number;
   bal: number;
+  bvn_verified_at?: Date;
   created_at?: Date;
   role: RoleName;
   last_login: Date;

@@ -226,6 +226,9 @@ export class UserService {
         if (foundUser.bal <= 0) {
           throw new Error('complete an active loan to set your bvn');
         }
+
+        // introduce bvn verification by verify-me and others
+
         field = {
           bvn: dto.bvn,
         };

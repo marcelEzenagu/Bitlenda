@@ -60,12 +60,7 @@ export class WithdrawalService {
         );
 
         const balance = availableBalResponse[0][0]['bal'];
-        console.log(
-          balance,
-          // amount > availableBalResponse,
-          'BALANC',
-          availableBalResponse[0][0],
-        );
+
         // return;
         if (amount > balance) {
           throw new BadRequestException('insufficient balance');
@@ -158,6 +153,10 @@ export class WithdrawalService {
       if (withdrawType === WITHDRAW_TYPE.CASH_WITHDRAW) {
         dto.asset = undefined;
         dto.address = undefined;
+
+        if (!dto.accountId) {
+          throw new BadRequestException('accountId required but missing');
+        }
       }
       // if (!token) {
       //   throw new BadRequestException('token required');
@@ -196,44 +195,8 @@ export class WithdrawalService {
         const reference = HelperUtils.generateReferenceNo();
 
         if (withdrawType === WITHDRAW_TYPE.CASH_WITHDRAW) {
-          console.log('GOT HERE');
           result = await this.handleBankWithdrawal(email, dto);
-          // return;
-          // const row = await trx.raw(
-          //   'SELECT bal FROM users WHERE email=? FOR UPDATE',
-          //   [email],
-          // );
-
-          // const bal = row[0][0].bal;
-          // if (amount > bal) {
-          //   throw new BadRequestException('insufficient balance');
-          // }
-
-          // await trx('transactions').insert([
-          //   {
-          //     type: 'BANK_WITHDRAW',
-          //     email,
-          //     direction: 'debit',
-          //     amount,
-          //     asset: 'NGN',
-          //     reference,
-          //     description: `withdrawal of ${amount} NGN`,
-          //   },
-          //   {
-          //     type: 'BANK_WITHDRAW',
-          //     email,
-          //     direction: 'debit',
-          //     amount,
-          //     asset: 'NGN',
-          //     reference,
-          //     description: `withdrawal Fee for ${amount} NGN`,
-          //   },
-          // ]);
-
-          // await trx('users').where({ email }).decrement({ bal: amount });
-        }
-
-        if (withdrawType === WITHDRAW_TYPE.CRYPTO_WITHDRAW) {
+        } else if (withdrawType === WITHDRAW_TYPE.CRYPTO_WITHDRAW) {
           const trx = await this.knex.transaction();
 
           const row = await trx.raw(
@@ -311,6 +274,8 @@ export class WithdrawalService {
   async handleBankWithdrawal(email, dto: WithdrawDto) {
     const { amount, accountId } = dto;
     try {
+      console.log('GOT HERE', amount, accountId);
+
       let bankAccount = await this.knex('bank_accounts')
         .select(
           'id',
@@ -323,6 +288,8 @@ export class WithdrawalService {
         .where('id', accountId)
         .where('email', email)
         .first();
+
+      console.log('bankAccount', bankAccount);
       if (bankAccount !== undefined) {
         const { account_number, bank_name, bank_code } = bankAccount;
         const trx = await this.knex.transaction();
@@ -374,10 +341,8 @@ export class WithdrawalService {
                   type: `BANK_WITHDRAW`,
                   reference: `${trxId}_fee`,
                   direction: 'debit',
-                  // slug: 'Bank_withdraw_fee',
                   asset: 'NGN',
                   amount: withdrawalFee,
-                  // Bank_bal: availableBal - (amount + withdrawalFee),
                   description: `Fee for Withdraw of  ${amount.toFixed(2)} NGN to ${
                     bankAccount.account_name
                   } (${bankAccount.bank_name})`,
@@ -387,10 +352,8 @@ export class WithdrawalService {
                   type: `BANK_WITHDRAW`,
                   reference: trxId,
                   direction: 'debit',
-                  // slug: 'bank_withdraw',
                   asset: 'NGN',
                   amount,
-                  // Bank_bal: availableBal - amount,
                   description: ` Withdraw of  ${amount.toFixed(2)} NGN to ${
                     bankAccount.account_name
                   } (${bankAccount.bank_name})`,

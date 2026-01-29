@@ -80,6 +80,19 @@ export class DepositsService {
   async handleTokenDeposit() {
     // const startTime = new Date().getMilliseconds();
 
+    // const del = await this.knex('users')
+    //   .where({ email: 'jayhost002@gmail.com' })
+    //   .increment('bal', 40000);
+
+    // console.log('DELE', del);
+    // const del1 = await this.knex('users')
+    //   .select('bal')
+    //   .where({ email: 'jayhost002@gmail.com' })
+    //   .first();
+    // console.log('DELE', del1);
+
+    // return;
+
     // const dateTime =
     //   startTime - Number(process.env.RECHARGE_SECONDS_TIME) * 60 * 1000;
 

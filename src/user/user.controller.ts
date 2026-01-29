@@ -427,6 +427,7 @@ export class UserController {
 
     return await this.userService.verifyBankAccount(email, dto);
   }
+
   @Delete('remove_bank')
   @ApiResponse({
     schema: {

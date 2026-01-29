@@ -549,7 +549,7 @@ export class AuthService {
       const foundOTP = await this.redisService.getValue(key);
 
       if (foundOTP != dto.otp) {
-        throw new UnprocessableEntityException();
+        throw new UnprocessableEntityException('invalid OTP');
       }
 
       const user = await this.usersService.findOne(createData);

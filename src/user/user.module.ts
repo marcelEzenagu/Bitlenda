@@ -15,6 +15,7 @@ import { RedisService } from 'src/common/redis.service';
 import { EmailService } from 'src/common/email.service';
 import { MexcService } from 'src/common/mexc/mexc.service';
 import { PalmPayService } from 'src/common/helpers/palmpay';
+import { WithdrawalMiddleware } from 'src/common/middleware/withdrawal.middleware';
 
 @Module({
   imports: [forwardRef(() => AuthModule), LoansModule, WithdrawalModule],
@@ -40,6 +41,13 @@ export class UserModule {
       { path: 'users/get-loan-address', method: RequestMethod.POST },
       { path: 'users/take-loan', method: RequestMethod.POST },
       { path: 'users/withdraw-confirm', method: RequestMethod.POST },
+      // add more routes here...
+    );
+    consumer.apply(WithdrawalMiddleware).forRoutes(
+      { path: 'users/withdraw-init', method: RequestMethod.POST },
+      { path: 'users/bank-withdraws', method: RequestMethod.POST },
+      { path: 'users/withdraw-confirm', method: RequestMethod.POST },
+      { path: 'users/withdraw-resend-token', method: RequestMethod.POST },
       // add more routes here...
     );
   }
