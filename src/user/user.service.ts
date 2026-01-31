@@ -231,6 +231,7 @@ export class UserService {
 
         field = {
           bvn: dto.bvn,
+          bvn_verified_at: new Date(),
         };
       }
 
